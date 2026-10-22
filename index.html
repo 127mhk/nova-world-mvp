@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#101d26">
+<title>NOVA WORLD — Prototype 0.1</title>
+<style>
+:root{--bg:#101d26;--panel:rgba(12,25,34,.88);--line:rgba(201,231,221,.22);--mint:#b7ead8;--gold:#f2ca82;--text:#f2f6f4;--muted:#b7c8c9}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d26;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
+#world{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;backdrop-filter:blur(12px);box-shadow:0 8px 30px #0003}
+#topbar{position:fixed;top:12px;left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
+.brand{pointer-events:auto;padding:10px 13px}.brand b{letter-spacing:.15em;font-size:14px}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.08em;margin-top:2px}
+#wallet{padding:10px 12px;font-size:12px;color:var(--gold);pointer-events:auto}
+#hint{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:8px 12px;color:var(--muted);font-size:11px;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+#leftControls{position:fixed;left:14px;bottom:20px;display:flex;align-items:end;gap:10px}
+#stick{width:112px;height:112px;border-radius:50%;border:1px solid #c4e6da55;background:#12273399;position:relative;touch-action:none}
+#nub{position:absolute;width:42px;height:42px;left:34px;top:34px;border-radius:50%;background:#b7ead8cc;border:2px solid #e5fff5;box-shadow:0 2px 12px #0006}
+#actions{position:fixed;right:14px;bottom:20px;display:flex;flex-direction:column;gap:8px}
+button{font:inherit;color:var(--text);border:1px solid var(--line);background:#19313d;border-radius:12px;padding:11px 13px;cursor:pointer}
+button:active{transform:scale(.98);background:#294958}
+button.primary{background:#b7ead8;color:#10222a;border-color:#b7ead8;font-weight:700}
+button.gold{border-color:#d6b76e;color:#f2d69c}
+.action{min-width:98px;font-size:12px}
+#bottomNote{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);font-size:10px;color:#d0dfdc99;white-space:nowrap;pointer-events:none}
+#drawer{position:fixed;left:12px;right:12px;bottom:145px;max-height:48vh;overflow:auto;padding:15px;display:none}
+#drawer.open{display:block}
+h2{font-size:17px;margin:0 0 8px}p{font-size:13px;line-height:1.55;color:#d5e1df;margin:6px 0 12px}
+.row{display:flex;gap:8px;align-items:center}.row>*{min-width:0}.row input{flex:1}
+input,textarea{width:100%;background:#0c1921;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:11px;font:inherit;font-size:14px;outline:none}
+input:focus,textarea:focus{border-color:var(--mint)}
+.small{font-size:11px;color:var(--muted)}.chips{display:flex;gap:7px;flex-wrap:wrap;margin:8px 0}.chip{font-size:11px;padding:6px 9px;border-radius:99px;background:#203b47;color:#d6eee6;border:1px solid #ffffff16}
+#items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.item{border:1px solid var(--line);border-radius:11px;padding:9px;font-size:12px;background:#132832}.item b{display:block;margin-bottom:4px}.item button{width:100%;margin-top:7px;padding:8px;font-size:11px}
+#dialogBackdrop{display:none;position:fixed;inset:0;background:#0008;align-items:center;justify-content:center;padding:20px}
+#dialogBackdrop.open{display:flex}#dialog{width:min(460px,100%);padding:18px}
+#chatLog{max-height:160px;overflow:auto;font-size:13px;line-height:1.5;margin:10px 0}.msg{padding:8px 10px;border-radius:10px;background:#203640;margin:6px 0}.msg.user{background:#244d48}
+#toast{position:fixed;top:125px;left:50%;transform:translateX(-50%);padding:10px 14px;border-radius:12px;background:#b7ead8;color:#10222a;font-size:12px;font-weight:700;display:none;max-width:88vw;text-align:center}
+@media(min-width:760px){#leftControls{left:24px;bottom:24px}#actions{right:24px;bottom:24px}#drawer{left:auto;right:24px;bottom:24px;width:380px;max-height:70vh}#hint{top:92px}}
+</style>
+</head>
+<body>
+<div id="world"></div>
+<div id="topbar">
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.1</small></div>
+  <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
+</div>
+<div id="hint" class="panel">未知の街へようこそ。住人に話しかけ、作品を作ろう。</div>
+<div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
+<div id="actions">
+  <button class="action" id="talkBtn">💬 住人と話す</button>
+  <button class="action" id="createBtn">✧ 作品を創作</button>
+  <button class="action" id="shopBtn">◇ マーケット</button>
+  <button class="action" id="inventoryBtn">▦ マイ作品</button>
+</div>
+<div id="drawer" class="panel"></div>
+<div id="bottomNote">左のパッドで移動 · PCは WASD / 矢印キー · 画面をドラッグして視点変更</div>
+<div id="dialogBackdrop"><div id="dialog" class="panel"></div></div>
+<div id="toast"></div>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.185.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+
+const $ = s => document.querySelector(s);
+const state = {
+ credits: 100,
+ items: [],
+ sold: [],
+ memories: {},
+ chatNpc: null,
+ moveX: 0, moveY: 0,
+ yaw: 0,
+ dragging: false,
+ lastX: 0, lastY: 0,
+}
+try {
+ const saved = JSON.parse(localStorage.getItem("nova-world-save") || "null");
+ if(saved){state.credits=saved.credits ?? 100;state.items=saved.items||[];state.sold=saved.sold||[];state.memories=saved.memories||{}}
+} catch(e){}
+function save(){try{localStorage.setItem("nova-world-save",JSON.stringify({credits:state.credits,items:state.items,sold:state.sold,memories:state.memories}))}catch(e){};$("#credits").textContent=state.credits}
+function toast(s){const t=$("#toast");t.textContent=s;t.style.display="block";clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.style.display="none",2100)}
+$("#credits").textContent=state.credits;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9bc6ce);
+scene.fog = new THREE.Fog(0x9bc6ce, 24, 100);
+const camera = new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,180);
+const renderer = new THREE.WebGLRenderer({antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.05;
+$("#world").appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xdff7ff,0x52604a,2.1));
+const sun=new THREE.DirectionalLight(0xffe5b8,3.0);sun.position.set(-12,24,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+const mat=(color,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
+const mats={
+ grass:mat(0x557d67), path:mat(0xc8b99a), stone:mat(0x8fa3a2), wall:mat(0xd9d4c4), dark:mat(0x2c4650), roof:mat(0x426a6b), glass:mat(0x7eb8bd,.3,.2),
+ wood:mat(0x9c7954), leaf:mat(0x4f826b), gold:mat(0xe5bc69,.4,.2), white:mat(0xf0eee3), blue:mat(0x77b8c9), pink:mat(0xc78c92), purple:mat(0x9783b8)
+};
+function box(parent,w,h,d,material,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m}
+function sphere(parent,r,material,x,y,z){const m=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+function cylinder(parent,rt,rb,h,material,x,y,z,segments=12){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segments),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),mats.grass);ground.rotation.x=-Math.PI/2;ground.position.y=-.08;ground.receiveShadow=true;scene.add(ground);
+// Plaza paths
+const path1=new THREE.Mesh(new THREE.PlaneGeometry(8,50),mats.path);path1.rotation.x=-Math.PI/2;path1.position.set(0,0,-1);scene.add(path1);
+const path2=new THREE.Mesh(new THREE.PlaneGeometry(38,7),mats.path);path2.rotation.x=-Math.PI/2;path2.position.set(0,.005,0);scene.add(path2);
+const plaza=new THREE.Mesh(new THREE.CircleGeometry(6,48),mats.stone);plaza.rotation.x=-Math.PI/2;plaza.position.y=.02;scene.add(plaza);
+const fountain=new THREE.Group();scene.add(fountain);cylinder(fountain,2.1,2.3,.35,mats.stone,0,.2,0,32);cylinder(fountain,1.45,1.7,.22,mats.blue,0,.45,0,32);cylinder(fountain,.3,.45,1.2,mats.gold,0,.95,0,20);sphere(fountain,.32,mats.blue,0,1.65,0);
+// buildings
+function building(x,z,w,d,h,name,accent){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ box(g,w,h,d,mats.wall,0,h/2,0);
+ box(g,w+.35,.35,d+.35,mats.roof,0,h+.16,0);
+ // windows and door
+ for(let sx of [-1,1]){box(g,.75,1.05,.08,mats.glass,sx*w*.27,h*.56,d/2+.045,false);box(g,.82,.1,.12,mat(accent),sx*w*.27,h*.56+0.58,d/2+.06,false)}
+ box(g,1.05,1.8,.12,mats.wood,0,.9,d/2+.07);
+ box(g,w*.75,.22,.3,mat(accent),0,h+.45,d/2+.03);
+ const sign=box(g,w*.6,.45,.12,mat(accent),0,h*.77,d/2+.08,false);
+ return g;
+}
+building(-10,-9,7,6,4.8,"WORKSHOP",0xc7a76e);
+building(10,-9,7,6,4.4,"MARKET",0x78bcb0);
+building(-13,8,6,6,3.6,"HOME",0x8c9fcb);
+building(13,8,6,6,3.6,"LAB",0xc78c92);
+// trees
+for(let i=0;i<36;i++){
+ const x=(Math.random()-.5)*66,z=(Math.random()-.5)*60;
+ if(Math.abs(x)<17&&Math.abs(z)<15)continue;
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ cylinder(g,.16,.23,1.7,mats.wood,0,.85,0,8);
+ const color=[0x47785f,0x5e8b69,0x78996b][i%3];const foliage=mat(color);
+ sphere(g,.72,foliage,0,1.95,0);sphere(g,.53,foliage,.38,2.3,.05);sphere(g,.5,foliage,-.38,2.25,-.05);
+}
+// mountains
+for(let i=0;i<14;i++){
+ const m=new THREE.Mesh(new THREE.ConeGeometry(4+Math.random()*5,10+Math.random()*12,6),mat(i%2?0x799b9c:0x8caeae));
+ m.position.set((i-7)*11,4,-47-Math.random()*15);m.rotation.y=Math.random();scene.add(m);
+}
+// avatar
+const player=new THREE.Group();scene.add(player);player.position.set(0,0,8);
+const avatarMat=mat(0x243e4b),skin=mat(0xd5aa86),cape=mat(0xb7ead8);
+sphere(player,.38,avatarMat,0,1.25,0);box(player,.65,.78,.4,cape,0,.72,0);sphere(player,.24,skin,0,1.42,.17);
+box(player,.18,.6,.18,avatarMat,-.2,.18,0);box(player,.18,.6,.18,avatarMat,.2,.18,0);
+const facing=new THREE.Object3D();facing.position.set(0,0,1);player.add(facing);
+// NPCs
+const npcs=[];
+function makeNpc(id,name,role,x,z,color,personality){
+ const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
+ const bodyMat=mat(color),headMat=mat(0xe0b99a);
+ sphere(g,.31,bodyMat,0,1.05,0);box(g,.48,.62,.32,bodyMat,0,.61,0);sphere(g,.22,headMat,0,1.47,.05);
+ sphere(g,.045,mat(0x1a2830),-.08,1.5,.24);sphere(g,.045,mat(0x1a2830),.08,1.5,.24);
+ cylinder(g,.04,.06,.36,mat(0xddd8bd),-.28,.62,0);cylinder(g,.04,.06,.36,mat(0xddd8bd),.28,.62,0);
+ const halo=new THREE.Mesh(new THREE.TorusGeometry(.38,.035,8,24),mat(0xb7ead8,.3,.3));halo.position.y=1.95;halo.rotation.x=Math.PI/2;g.add(halo);
+ npcs.push({id,name,role,personality,group:g,halo});
+}
+makeNpc("mira","MIRA","街の案内人",-3,2,0x6f9f9c,"親切で好奇心旺盛。街の未来を気にしている");
+makeNpc("ren","REN","工房の職人",-10,-3,0xb98b60,"寡黙だが作品を見る目が鋭い。新しい家具が好き");
+makeNpc("sol","SOL","マーケット商人",9,-3,0x9b8bc3,"陽気で商売上手。街に役立つ作品を探している");
+
+const createdMeshes=[];
+function colorFor(text){if(/青|ブルー|水色|光る|氷/.test(text))return 0x69b9d0;if(/赤|朱|ピンク|花/.test(text))return 0xd78d9c;if(/金|黄|黄金|光/.test(text))return 0xe3bd68;if(/紫|むらさき/.test(text))return 0x9b8bd0;if(/白|雪/.test(text))return 0xecebe2;if(/黒|暗/.test(text))return 0x34434a;if(/緑|木|植物|葉/.test(text))return 0x76a77a;return 0xb8c6c0}
+function inferType(text){if(/椅子|イス|chair/.test(text))return "chair";if(/木|机|テーブル|table/.test(text))return "table";if(/街灯|ランプ|灯|light/.test(text))return "lamp";if(/木|植物|花|鉢|plant/.test(text))return "plant";if(/箱|宝箱|crate/.test(text))return "crate";return "crystal"}
+function buildItemMesh(type,color){
+ const g=new THREE.Group(),cm=mat(color,.65,.08),wood=mat(0x9c7954);
+ if(type==="chair"){box(g,.8,.14,.8,wood,0,.75,0);box(g,.8,.65,.13,cm,0,1.08,-.32);for(const x of [-.3,.3])for(const z of [-.3,.3])box(g,.12,.72,.12,wood,x,.36,z)}
+ else if(type==="table"){box(g,1.15,.14,.8,cm,0,.9,0);for(const x of [-.43,.43])for(const z of [-.27,.27])box(g,.1,.88,.1,wood,x,.44,z)}
+ else if(type==="lamp"){cylinder(g,.06,.1,1.6,wood,0,.8,0);sphere(g,.28,mat(color,.3,.2),0,1.72,0);const light=new THREE.PointLight(color,1.2,5);light.position.y=1.8;g.add(light)}
+ else if(type==="plant"){cylinder(g,.28,.34,.42,mat(0xb77955),0,.21,0);const leaf=mat(0x4e9b72);for(let i=0;i<5;i++){const l=sphere(g,.18,leaf,Math.cos(i*1.25)*.18,.55+i*.15,Math.sin(i*1.25)*.18);l.scale.set(.7,1.8,.7)}}
+ else if(type==="crate"){box(g,.8,.8,.8,cm,0,.4,0);box(g,.84,.08,.08,wood,0,.4,.42);box(g,.08,.84,.08,wood,0,.4,.42)}
+ else {const m=new THREE.Mesh(new THREE.OctahedronGeometry(.65,0),new THREE.MeshStandardMaterial({color,roughness:.25,metalness:.25,emissive:color,emissiveIntensity:.12}));m.position.y=.7;g.add(m);const ring=new THREE.Mesh(new THREE.TorusGeometry(.8,.035,8,28),mat(0xb7ead8,.25,.3));ring.rotation.x=Math.PI/2;ring.position.y=.5;g.add(ring)}
+ return g;
+}
+function placeCreated(item,atPlayer=true){
+ const mesh=buildItemMesh(item.type,item.color);const forward=new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
+ mesh.position.copy(player.position).add(forward.multiplyScalar(atPlayer?2.2:0));mesh.position.y=0;
+ if(!atPlayer){mesh.position.set(item.x||0,0,item.z||0)}
+ scene.add(mesh);createdMeshes.push({id:item.id,mesh});return mesh;
+}
+state.items.forEach(it=>{if(it.placed)placeCreated(it,false)});
+
+function openDrawer(html){$("#drawer").innerHTML=html;$("#drawer").classList.add("open")}
+function closeDrawer(){$("#drawer").classList.remove("open")}
+function nearestNpc(){let best=null,dist=999;for(const n of npcs){const d=n.group.position.distanceTo(player.position);if(d<dist){dist=d;best=n}}return dist<5?best:null}
+function talk(){
+ const n=nearestNpc();
+ if(!n){toast("住人の近くまで移動してください");return}
+ state.chatNpc=n;
+ const mem=state.memories[n.id]||{count:0,last:""};
+ const intro={
+ mira:`こんにちは！私は${n.name}。この街の案内人です。${mem.count?`また会えましたね。前に「${mem.last}」について話しましたね。`:"この街は、創作者のアイデアで少しずつ変わっていきます。"}何を作ってみたいですか？`,
+ ren:`……${n.name}です。工房で物を作っています。${mem.count?`前回は「${mem.last}」の話でしたね。`:"良い作品は、見た目だけでなく使う人のことを考えて作るものです。"}何か作りましたか？`,
+ sol:`いらっしゃい！${n.name}です。マーケット担当ですよ。${mem.count?`また来てくれたんですね。「${mem.last}」の話、覚えていますよ。`:"街で役に立つ作品を探しているんです。"}作品を見せてください！`
+ }[n.id];
+ $("#dialog").innerHTML=`<h2>${n.name} <span class="small">· ${n.role}</span></h2><p>${intro}</p><div id="chatLog"><div class="msg">${intro}</div></div><div class="row"><input id="chatInput" placeholder="住人に話しかける…" maxlength="180"><button class="primary" id="sendChat">送信</button></div><div class="chips"><span class="chip">街のこと</span><span class="chip">作品の相談</span><span class="chip">今日の目標</span></div><button id="closeDialog" style="width:100%;margin-top:8px">閉じる</button>`;
+ $("#dialogBackdrop").classList.add("open");
+ $("#sendChat").onclick=()=>sendChat(n);
+ $("#chatInput").addEventListener("keydown",e=>{if(e.key==="Enter")sendChat(n)});
+ $("#closeDialog").onclick=()=>$("#dialogBackdrop").classList.remove("open");
+}
+function sendChat(n){
+ const inp=$("#chatInput"),text=inp.value.trim();if(!text)return;
+ const log=$("#chatLog");const u=document.createElement("div");u.className="msg user";u.textContent="あなた："+text;log.appendChild(u);
+ const mem=state.memories[n.id]||{count:0,last:""};
+ let reply;
+ if(/作|創|家具|作品|アイデア/.test(text))reply=n.id==="ren"?"いいですね。まず形と素材を考えましょう。右の「作品を創作」から試してみてください。":n.id==="sol"?"それは面白い！マーケットに並べたら、街の人も気に入るかもしれません。":"ぜひ形にしてみましょう。作品を作ると、この街に新しいものが増えていきます。";
+ else if(/街|世界|未来|変わ/.test(text))reply="この街はまだ発展の途中です。創作者が増えるほど、ここでできることも増えていきます。";
+ else reply=`なるほど、「${text.slice(0,42)}」ですね。${n.personality}。そのアイデアを作品にしてみるのも良さそうです。`;
+ const a=document.createElement("div");a.className="msg";a.textContent=n.name+"："+reply;log.appendChild(a);log.scrollTop=log.scrollHeight;
+ state.memories[n.id]={count:mem.count+1,last:text.slice(0,48)};save();inp.value="";
+}
+function createPanel(){
+ closeDrawer();
+ openDrawer(`<h2>✧ 文章から作品を創作</h2><p>作りたいものを日本語で入力してください。入力内容をもとに、試作品内の3Dパーツを組み合わせて生成します。</p><input id="prompt" placeholder="例：青く光る未来の街灯" maxlength="70"><div class="chips"><button class="chip" data-prompt="木製の椅子">木製の椅子</button><button class="chip" data-prompt="青く光る街灯">青い街灯</button><button class="chip" data-prompt="緑の植物の鉢">植物の鉢</button><button class="chip" data-prompt="金色のクリスタル">金色のクリスタル</button></div><button class="primary" id="generate" style="width:100%">作品を生成する</button><p class="small">試作版：文章を解析して既存パーツを組み合わせます。外部AIによる3Dモデル生成はまだ行いません。</p>`);
+ $("#drawer").querySelectorAll("[data-prompt]").forEach(b=>b.onclick=()=>{$("#prompt").value=b.dataset.prompt});
+ $("#generate").onclick=()=>{
+  const text=$("#prompt").value.trim();if(!text){toast("作りたいものを入力してください");return}
+  const type=inferType(text),color=colorFor(text),item={id:"i"+Date.now(),name:text,type,color,price:20,placed:true,x:player.position.x+Math.sin(player.rotation.y)*2.2,z:player.position.z+Math.cos(player.rotation.y)*2.2};
+  state.items.push(item);placeCreated(item,true);save();renderInventory();
+  toast("作品を生成しました！ マイ作品から出品できます。");
+  openDrawer(`<h2>作品が完成しました</h2><p>「${escapeHtml(text)}」を街に配置しました。マーケットから出品できます。</p><button class="primary" id="toInventory" style="width:100%">マイ作品を見る</button><button id="again" style="width:100%;margin-top:8px">続けて創作</button>`);
+  $("#toInventory").onclick=renderInventory;$("#again").onclick=createPanel;
+ };
+}
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function renderInventory(){
+ closeDrawer();
+ let html=`<h2>▦ マイ作品</h2><p>作った作品を確認し、マーケットに出品できます。</p>`;
+ if(!state.items.length)html+=`<p>まだ作品がありません。まずは「作品を創作」から作ってみましょう。</p>`;
+ html+='<div id="items">';
+ for(const it of state.items){const listed=it.listed;html+=`<div class="item"><b>${escapeHtml(it.name)}</b><span class="small">${it.type} · ${listed?"出品中":"未出品"}</span><button data-list="${it.id}">${listed?"出品を取り下げ":"20 NOVAで出品"}</button></div>`}
+ html+='</div>';
+ openDrawer(html);
+ $("#drawer").querySelectorAll("[data-list]").forEach(b=>b.onclick=()=>{const it=state.items.find(x=>x.id===b.dataset.list);if(!it)return;it.listed=!it.listed;it.price=20;save();renderInventory();toast(it.listed?"マーケットに出品しました":"出品を取り下げました")});
+}
+function renderShop(){
+ closeDrawer();let listed=state.items.filter(x=>x.listed);
+ let html=`<h2>◇ NOVAマーケット</h2><p>街の創作者が作った作品を、仮想通貨NOVAで購入するテスト用ショップです。</p>`;
+ if(!listed.length)html+=`<p>現在出品中の作品はありません。自分の作品を作って出品してみましょう。</p>`;
+ html+='<div id="items">';
+ for(const it of listed){html+=`<div class="item"><b>${escapeHtml(it.name)}</b><span class="small">${it.price} NOVA</span><button data-buy="${it.id}">購入する</button></div>`}
+ html+='</div><p class="small">購入は試作用のゲーム内取引です。現実のお金の決済・換金はありません。</p>';
+ openDrawer(html);
+ $("#drawer").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{const it=state.items.find(x=>x.id===b.dataset.buy);if(!it)return;if(state.credits<it.price){toast("NOVAが足りません");return}state.credits-=it.price;it.listed=false;state.sold.push({name:it.name,price:it.price});save();renderShop();toast("購入しました（試作用）")});
+}
+$("#talkBtn").onclick=talk;$("#createBtn").onclick=createPanel;$("#shopBtn").onclick=renderShop;$("#inventoryBtn").onclick=renderInventory;
+$("#hint").onclick=()=>toast("広場の住人に近づいて「住人と話す」を押してみましょう");
+$("#dialogBackdrop").addEventListener("click",e=>{if(e.target===$("#dialogBackdrop"))$("#dialogBackdrop").classList.remove("open")});
+
+// Touch joystick
+const stick=$("#stick"),nub=$("#nub");let stickRect=null;
+function stickMove(e){const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;let dx=e.clientX-cx,dy=e.clientY-cy;const max=34,len=Math.hypot(dx,dy);if(len>max){dx=dx/len*max;dy=dy/len*max}nub.style.left=(34+dx)+"px";nub.style.top=(34+dy)+"px";state.moveX=dx/max;state.moveY=dy/max}
+stick.addEventListener("pointerdown",e=>{stick.setPointerCapture(e.pointerId);stickMove(e)});
+stick.addEventListener("pointermove",e=>{if(e.buttons||e.pressure>0)stickMove(e)});
+function resetStick(){nub.style.left="34px";nub.style.top="34px";state.moveX=0;state.moveY=0}
+stick.addEventListener("pointerup",resetStick);stick.addEventListener("pointercancel",resetStick);
+// Drag screen to rotate camera
+renderer.domElement.addEventListener("pointerdown",e=>{if(e.clientX<140&&e.clientY>innerHeight-160)return;state.dragging=true;state.lastX=e.clientX;state.lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});
+renderer.domElement.addEventListener("pointermove",e=>{if(!state.dragging)return;const dx=e.clientX-state.lastX;state.lastX=e.clientX;state.lastY=e.clientY;state.yaw-=dx*.006;});
+renderer.domElement.addEventListener("pointerup",()=>state.dragging=false);renderer.domElement.addEventListener("pointercancel",()=>state.dragging=false);
+const keys={};addEventListener("keydown",e=>{keys[e.key.toLowerCase()]=true});addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false});
+let last=performance.now();
+function animate(now){
+ requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.04);last=now;
+ let x=state.moveX,z=state.moveY;
+ if(keys.w||keys.arrowup)z=-1;if(keys.s||keys.arrowdown)z=1;if(keys.a||keys.arrowleft)x=-1;if(keys.d||keys.arrowright)x=1;
+ const len=Math.hypot(x,z);if(len>1){x/=len;z/=len}
+ const speed=5.2;
+ if(len>.08){const dx=(x*Math.cos(state.yaw)+z*Math.sin(state.yaw))*speed*dt;const dz=(-x*Math.sin(state.yaw)+z*Math.cos(state.yaw))*speed*dt;player.position.x+=dx;player.position.z+=dz;player.rotation.y=Math.atan2(dx,dz)}
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-28,28);player.position.z=THREE.MathUtils.clamp(player.position.z,-28,28);
+ const targetYaw=state.yaw;const camDist=7.2,camHeight=4.1;
+ const desired=new THREE.Vector3(player.position.x-Math.sin(targetYaw)*camDist,player.position.y+camHeight,player.position.z-Math.cos(targetYaw)*camDist);
+ camera.position.lerp(desired,.09);camera.lookAt(player.position.x,1.2,player.position.z);
+ for(const n of npcs){n.halo.rotation.z+=dt*.4;n.group.lookAt(player.position.x,0,player.position.z)}
+ renderer.render(scene,camera);
+}
+requestAnimationFrame(animate);
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.7))});
+save();
+</script>
+</body>
+</html>
