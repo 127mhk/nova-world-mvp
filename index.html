@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#101d26">
-<title>NOVA WORLD — Prototype 0.1</title>
+<title>NOVA WORLD — Prototype 0.3</title>
 <style>
 :root{--bg:#101d26;--panel:rgba(12,25,34,.88);--line:rgba(201,231,221,.22);--mint:#b7ead8;--gold:#f2ca82;--text:#f2f6f4;--muted:#b7c8c9}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d26;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
@@ -13,7 +13,7 @@
 #topbar{position:fixed;top:12px;left:12px;right:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none}
 .brand{pointer-events:auto;padding:10px 13px}.brand b{letter-spacing:.15em;font-size:14px}.brand small{display:block;color:var(--muted);font-size:10px;letter-spacing:.08em;margin-top:2px}
 #wallet{padding:10px 12px;font-size:12px;color:var(--gold);pointer-events:auto}
-#hint{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:8px 12px;color:var(--muted);font-size:11px;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+#district{position:fixed;top:125px;left:12px;padding:8px 12px;font-size:11px;letter-spacing:.05em;color:#c9ecf3;pointer-events:none}#hint{position:fixed;top:82px;left:50%;transform:translateX(-50%);padding:8px 12px;color:var(--muted);font-size:11px;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
 #leftControls{position:fixed;left:14px;bottom:20px;display:flex;align-items:end;gap:10px}
 #stick{width:112px;height:112px;border-radius:50%;border:1px solid #c4e6da55;background:#12273399;position:relative;touch-action:none}
 #nub{position:absolute;width:42px;height:42px;left:34px;top:34px;border-radius:50%;background:#b7ead8cc;border:2px solid #e5fff5;box-shadow:0 2px 12px #0006}
@@ -43,10 +43,11 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.2</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.3</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
-<div id="hint" class="panel">未知の街へようこそ。住人に話しかけ、作品を作ろう。</div>
+<div id="hint" class="panel">NOVA CENTRAL · 4つの地区を探索しよう</div>
+<div id="district" class="panel">◉ NOVA CENTRAL</div>
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
   <button class="action" id="talkBtn">💬 住人と話す</button>
@@ -55,7 +56,7 @@ input:focus,textarea:focus{border-color:var(--mint)}
   <button class="action" id="inventoryBtn">▦ マイ作品</button>
 </div>
 <div id="drawer" class="panel"></div>
-<div id="bottomNote">左のパッドで移動 · PCは WASD / 矢印キー · 画面をドラッグして視点変更</div>
+<div id="bottomNote">左パッドで移動 · 画面ドラッグで視点変更 · 4地区を探索</div>
 <div id="dialogBackdrop"><div id="dialog" class="panel"></div></div>
 <div id="toast"></div>
 <script type="importmap">
@@ -85,11 +86,11 @@ function toast(s){const t=$("#toast");t.textContent=s;t.style.display="block";cl
 $("#credits").textContent=state.credits;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x9bc6ce);
-scene.fog = new THREE.FogExp2(0x9bc6ce, 0.011);
-const camera = new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,180);
+scene.background = new THREE.Color(0x9bb4c4);
+scene.fog = new THREE.FogExp2(0x9bb4c4, 0.008);
+const camera = new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,210);
 const renderer = new THREE.WebGLRenderer({antialias:true,alpha:false});
-renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.45));
 renderer.setSize(innerWidth,innerHeight);
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -99,10 +100,10 @@ renderer.toneMappingExposure=1.05;
 $("#world").appendChild(renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xdff7ff,0x52604a,2.1));
-const sun=new THREE.DirectionalLight(0xffe5b8,3.0);sun.position.set(-12,24,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-35;sun.shadow.camera.right=35;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;sun.shadow.bias=-0.0003;scene.add(sun);
+const sun=new THREE.DirectionalLight(0xffe5b8,3.0);sun.position.set(-12,24,10);sun.castShadow=true;sun.shadow.mapSize.set(768,768);sun.shadow.camera.left=-35;sun.shadow.camera.right=35;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;sun.shadow.bias=-0.0003;scene.add(sun);
 const mat=(color,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
 const mats={
- grass:mat(0x557d67), path:mat(0xc8b99a), stone:mat(0x8fa3a2), wall:mat(0xd9d4c4), dark:mat(0x2c4650), roof:mat(0x426a6b), glass:mat(0x7eb8bd,.3,.2),
+ grass:mat(0x5e8277), path:mat(0x899da7), stone:mat(0xa4b3b6), wall:mat(0xd9d4c4), dark:mat(0x2c4650), roof:mat(0x426a6b), glass:mat(0x7eb8bd,.3,.2),
  wood:mat(0x9c7954), leaf:mat(0x4f826b), gold:mat(0xe5bc69,.4,.2), white:mat(0xf0eee3), blue:mat(0x77b8c9), pink:mat(0xc78c92), purple:mat(0x9783b8)
 };
 function box(parent,w,h,d,material,x,y,z,cast=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);m.castShadow=cast;m.receiveShadow=true;parent.add(m);return m}
@@ -139,34 +140,24 @@ function building(x,z,w,d,h,name,accent){
  box(g,w+.48,.11,d+.48,mat(accent),0,h+.39,0);
  return g;
 }
-building(-10,-9,7,6,4.8,"WORKSHOP",0xc7a76e);
-building(10,-9,7,6,4.4,"MARKET",0x78bcb0);
-building(-13,8,6,6,3.6,"HOME",0x8c9fcb);
-building(13,8,6,6,3.6,"LAB",0xc78c92);
-// trees
-for(let i=0;i<36;i++){
- const x=(Math.random()-.5)*66,z=(Math.random()-.5)*60;
- if(Math.abs(x)<17&&Math.abs(z)<15)continue;
- const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
- cylinder(g,.16,.23,1.7,mats.wood,0,.85,0,8);
- const color=[0x47785f,0x5e8b69,0x78996b][i%3];const foliage=mat(color);
- sphere(g,.72,foliage,0,1.95,0);sphere(g,.53,foliage,.38,2.3,.05);sphere(g,.5,foliage,-.38,2.25,-.05);
-}
-// mountains
-for(let i=0;i<14;i++){
- const m=new THREE.Mesh(new THREE.ConeGeometry(4+Math.random()*5,10+Math.random()*12,6),mat(i%2?0x799b9c:0x8caeae));
- m.position.set((i-7)*11,4,-47-Math.random()*15);m.rotation.y=Math.random();scene.add(m);
-}
 // Visual upgrade 0.2: lightweight, procedural environment, no paid assets.
 let seed=21977;function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
 const decor=new THREE.Group();scene.add(decor);
 const paving=mat(0xb9b0a0),curb=mat(0xded8c7),metal=mat(0x425b60,.46,.48),flowerPink=mat(0xd8919a),flowerGold=mat(0xecc77c),bark=mat(0x6c5543);
-// Cobblestone edge and center promenade
-for(let z=-24;z<24;z+=2.15){for(const side of [-1,1]){
- box(decor,.18,.075,1.7,curb,side*4.05,.045,z,false);
- if(z%4<2)box(decor,.34,.025,.38,paving,side*3.65,.03,z,false);
-}}
-for(let x=-18;x<19;x+=2.1){for(const side of [-1,1])box(decor,1.75,.08,.18,curb,x,.05,side*3.55,false)}
+// Four district avenues with polished pavement and clear curbs.
+const roadMat=mat(0x566b78,.91),walkMat=mat(0xa9b8bc,.92),stripeMat=mat(0xe1e6dc,.8);
+for(const [w,d,x,z] of [[8,62,0,0],[62,8,0,0]]){
+ const r=new THREE.Mesh(new THREE.PlaneGeometry(w,d),roadMat);r.rotation.x=-Math.PI/2;r.position.set(x,.034,z);decor.add(r);
+}
+for(let v=-29;v<=29;v+=3){
+ box(decor,.13,.045,1.2,stripeMat,0,.061,v,false);
+ box(decor,1.2,.045,.13,stripeMat,v,.063,0,false);
+}
+for(let v=-28;v<29;v+=2.2){
+ for(const s of [-1,1]){
+ box(decor,.17,.12,1.8,walkMat,s*4.15,.095,v,false);
+ box(decor,1.8,.12,.17,walkMat,v,.095,s*4.15,false);
+ }}
 // Modern lamp posts; use emissive globes instead of costly point lights.
 const lampGlow=new THREE.MeshStandardMaterial({color:0xffdf9c,emissive:0xffc46c,emissiveIntensity:1.25,roughness:.45});
 function streetLamp(x,z){const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
@@ -191,16 +182,6 @@ function planter(x,z){const g=new THREE.Group();g.position.set(x,0,z);decor.add(
  cylinder(g,.035,.05,.32,mats.leaf,xx,.54,zz,6);
  }}
 for(const [x,z] of [[-6,-7],[6,-7],[-6,7],[6,7],[-16,-1],[16,-1]])planter(x,z);
-// Flower patches on grass: limited mesh count for Android performance.
-for(let i=0;i<72;i++){const x=(rnd()-.5)*56,z=(rnd()-.5)*54;
- if(Math.abs(x)<19&&Math.abs(z)<15)continue;
- const clump=new THREE.Group();clump.position.set(x,0,z);decor.add(clump);
- const bloom=i%3===0?flowerGold:flowerPink;
- for(let j=0;j<3;j++){const a=j*2.1;
- cylinder(clump,.025,.045,.24,mats.leaf,Math.cos(a)*.22,.13,Math.sin(a)*.22,5);
- sphere(clump,.085,bloom,Math.cos(a)*.22,.28,Math.sin(a)*.22);
- }
-}
 // Low-poly layered clouds in the distant sky.
 const clouds=[];const cloudMat=new THREE.MeshBasicMaterial({color:0xf5f4eb,transparent:true,opacity:.57,depthWrite:false});
 for(let i=0;i<8;i++){const c=new THREE.Group();c.position.set((i-4)*15,16+(i%3)*2,-42-i*2);scene.add(c);
@@ -211,6 +192,88 @@ waterDisk.rotation.x=-Math.PI/2;waterDisk.position.set(0,.575,0);fountain.add(wa
 const rippleMat=new THREE.MeshBasicMaterial({color:0xdafaff,transparent:true,opacity:.65,depthWrite:false});
 const ripples=[];
 for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.RingGeometry(.38,.42,40),rippleMat.clone());r.rotation.x=-Math.PI/2;r.position.set(0,.584+i*.002,0);fountain.add(r);ripples.push(r)}
+// NOVA 0.3 — four connected districts. Lightweight geometry; no external assets.
+const facade=mat(0xd8e2e5,.64,.16),titanium=mat(0x506777,.38,.7),darkGlass=mat(0x4b8398,.19,.48);
+const warmGlass=new THREE.MeshStandardMaterial({color:0x9ab8bd,metalness:.24,roughness:.23,emissive:0x173d4b,emissiveIntensity:.22});
+const emissiveTrim=new THREE.MeshStandardMaterial({color:0x6cd4e2,emissive:0x31a9c0,emissiveIntensity:.65,metalness:.25,roughness:.35});
+const parkGround=mat(0x507e68),pondMat=new THREE.MeshStandardMaterial({color:0x478ea1,metalness:.18,roughness:.2,transparent:true,opacity:.88});
+const wallLight=new THREE.MeshStandardMaterial({color:0xffdfab,emissive:0xffb968,emissiveIntensity:.55});
+function modernTower(x,z,w,d,h,style=0){
+ const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
+ const main=style%2?facade:titanium;
+ box(g,w,h,d,main,0,h/2,0,false);
+ box(g,w+.12,.28,d+.12,mat(0x304b59,.35,.6),0,h+.12,0,false);
+ for(let y=1.4;y<h-1;y+=1.65){
+  for(let xx=-w/2+0.62;xx<w/2-.1;xx+=1.13){
+   box(g,.78,1.12,.045,(Math.round(xx*3+y)%4===0?warmGlass:darkGlass),xx,y,d/2+.028,false);
+   box(g,.78,1.12,.045,darkGlass,xx,y,-d/2-.028,false);
+  }
+  box(g,w+.1,.075,d+.1,facade,0,y+.65,0,false);
+ }
+ box(g,1.25,2,.09,warmGlass,0,1,d/2+.055,false);
+ box(g,w+.3,.14,.16,emissiveTrim,0,h+.28,d/2+.07,false);
+ return g;
+}
+function retail(x,z,w=4.6,accent=emissiveTrim){
+ const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
+ box(g,w,3.4,4.5,facade,0,1.7,0,false);
+ box(g,w+.35,.22,4.8,titanium,0,3.5,0,false);
+ box(g,w-.6,1.8,.07,darkGlass,0,1.35,2.3,false);
+ box(g,w-.2,.22,.35,accent,0,2.5,2.37,false);
+ for(let i=-1;i<=1;i++)box(g,.045,1.8,.12,titanium,i*(w-.6)/3,1.35,2.37,false);
+ box(g,1.3,1.75,.13,warmGlass,0,.92,2.38,false);
+ box(g,w+.8,.1,1.25,titanium,0,2.75,2.85,false);
+ return g;
+}
+function residence(x,z,rot=0){
+ const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;decor.add(g);
+ box(g,4.8,3.15,4.3,facade,0,1.58,0,false);
+ box(g,5.2,.2,4.7,titanium,0,3.25,0,false);
+ box(g,1.2,1.9,.07,darkGlass,-1.1,1.85,2.19,false);
+ box(g,1.2,1.9,.07,darkGlass,1.1,1.85,2.19,false);
+ box(g,1.05,1.95,.12,mat(0x4e6672),0,.98,2.2,false);
+ box(g,4.5,.11,.22,emissiveTrim,0,3.18,2.28,false);
+ box(g,5.5,.13,1.05,walkMat,0,.05,2.65,false);
+ return g;
+}
+function cityTree(x,z,s=1){
+ const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(s);decor.add(g);
+ cylinder(g,.14,.23,2.1,mat(0x715d49),0,1.05,0,7);
+ const leaf=mat(0x417b6d);
+ sphere(g,.85,leaf,0,2.42,0);sphere(g,.62,leaf,.53,2.6,.12);sphere(g,.62,leaf,-.5,2.7,-.12);
+}
+function districtMarker(x,z,color){
+ const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
+ cylinder(g,.1,.13,2.5,titanium,0,1.25,0);
+ box(g,1.65,.57,.12,mat(color,.36,.42),.72,2.5,0,false);
+ box(g,1.5,.055,.14,emissiveTrim,.72,2.16,0,false);
+}
+// North-east: NOVA CENTRAL / futuristic skyline.
+modernTower(11,-17,5,5,13,0);modernTower(19,-18,5.6,5.4,17,1);
+modernTower(12,-27,5,4.7,11,1);modernTower(25,-26,4.7,5.3,14,0);
+districtMarker(7,-7,0x4f93aa);
+// South-east: CREATOR STREET / stores and workshops.
+retail(11,14,4.5);retail(19,14,4.6,wallLight);
+retail(11,24,4.5,wallLight);retail(19,24,4.6);
+for(const z of [11,20,28])cityTree(26,z,.85);
+districtMarker(7,8,0xc8b77d);
+// South-west: LIFE DISTRICT / human scale homes and community.
+residence(-12,13);residence(-21,13);residence(-12,23);residence(-21,23);
+for(const [x,z] of [[-27,10],[-27,20],[-7,26],[-17,28]])cityTree(x,z,.88);
+districtMarker(-7,8,0x9eb3ad);
+// North-west: GREEN FRONTIER / pond, grove, and quiet walking trail.
+const park=new THREE.Mesh(new THREE.PlaneGeometry(22,22),parkGround);park.rotation.x=-Math.PI/2;park.position.set(-17,.055,-18);decor.add(park);
+const pond=new THREE.Mesh(new THREE.CircleGeometry(4.1,40),pondMat);pond.rotation.x=-Math.PI/2;pond.scale.set(1.2,.85,1);pond.position.set(-18,.07,-19);decor.add(pond);
+for(const [x,z,s] of [[-26,-10,1.1],[-25,-17,1],[-26,-26,1.2],[-11,-27,1],[-9,-15,.95],[-18,-9,.9]])cityTree(x,z,s);
+for(const x of [-23,-19,-15]){box(decor,.55,.11,1.4,walkMat,x,.11,-12,false)}
+districtMarker(-7,-7,0x72ae92);
+// Add low-cost perimeter skyline for urban depth.
+for(let i=0;i<18;i++){
+ const x=-45+i*5.3,h=8+(i*7%14);
+ box(decor,3.8,h,3.7,mat(i%3?0x718a99:0x5a7584,.8,.18),x,h/2,-53,false);
+}
+// Repeated planted strips soften the avenues.
+for(let z=-27;z<=27;z+=7){if(Math.abs(z)<8)continue;cityTree(-5.6,z,.65);cityTree(5.6,z,.65)}
 // avatar
 const player=new THREE.Group();scene.add(player);player.position.set(0,0,8);
 const avatarMat=mat(0x243e4b),skin=mat(0xd5aa86),cape=mat(0xb7ead8);
@@ -341,7 +404,10 @@ function animate(now){
  const len=Math.hypot(x,z);if(len>1){x/=len;z/=len}
  const speed=5.2;
  if(len>.08){const dx=(x*Math.cos(state.yaw)+z*Math.sin(state.yaw))*speed*dt;const dz=(-x*Math.sin(state.yaw)+z*Math.cos(state.yaw))*speed*dt;player.position.x+=dx;player.position.z+=dz;player.rotation.y=Math.atan2(dx,dz)}
- player.position.x=THREE.MathUtils.clamp(player.position.x,-28,28);player.position.z=THREE.MathUtils.clamp(player.position.z,-28,28);
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-29,29);player.position.z=THREE.MathUtils.clamp(player.position.z,-29,29);
+ const px=player.position.x,pz=player.position.z;
+ const zone=Math.abs(px)<6||Math.abs(pz)<6?"◉ NOVA CENTRAL · 中央広場":(px>0?(pz<0?"◈ NOVA CENTRAL · 近未来都市":"◇ CREATOR STREET · 商業地区"):(pz<0?"❋ GREEN FRONTIER · 自然地区":"⌂ LIFE DISTRICT · 住宅地区"));
+ if(zone!==state.currentZone){state.currentZone=zone;$("#district").textContent=zone}
  const targetYaw=state.yaw;const camDist=7.2,camHeight=4.1;
  const desired=new THREE.Vector3(player.position.x-Math.sin(targetYaw)*camDist,player.position.y+camHeight,player.position.z-Math.cos(targetYaw)*camDist);
  camera.position.lerp(desired,.09);camera.lookAt(player.position.x,1.2,player.position.z);
