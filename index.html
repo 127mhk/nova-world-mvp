@@ -43,13 +43,14 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.6</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.7</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
-<div id="hint" class="panel">NOVA WORLD · 住人と暮らす世界へ</div>
+<div id="hint" class="panel">NOVA WORLD · 世界を保存して未来へ</div>
 <div id="district" class="panel">◉ NOVA CENTRAL</div>
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
+  <button class="action" id="backupBtn">☁ 世界データ</button>
   <button class="action" id="societyBtn">♧ AI社会</button>
   <button class="action" id="plotBtn">⌂ マイ土地</button>
   <button class="action" id="missionBtn">◎ ミッション</button>
@@ -344,7 +345,9 @@ function talk(){
  const intro={
  mira:`こんにちは！私は${n.name}。この街の案内人です。${mem.count?`また会えましたね。前に「${mem.last}」について話しましたね。`:"この街は、創作者のアイデアで少しずつ変わっていきます。"}何を作ってみたいですか？`,
  ren:`……${n.name}です。工房で物を作っています。${mem.count?`前回は「${mem.last}」の話でしたね。`:"良い作品は、見た目だけでなく使う人のことを考えて作るものです。"}何か作りましたか？`,
- sol:`いらっしゃい！${n.name}です。マーケット担当ですよ。${mem.count?`また来てくれたんですね。「${mem.last}」の話、覚えていますよ。`:"街で役に立つ作品を探しているんです。"}作品を見せてください！`
+ sol:`いらっしゃい！${n.name}です。マーケット担当ですよ。${mem.count?`また来てくれたんですね。「${mem.last}」の話、覚えていますよ。`:"街で役に立つ作品を探しているんです。"}作品を見せてください！`,
+ aya:`こんにちは、AYAです。自然地区の研究員です。${mem.count?"またお会いしましたね。":"木や水辺を観察しています。"}`,
+ leo:`こんにちは、LEOです。住宅地区で暮らしています。${mem.count?"また来てくれたんですね。":"この街で新しい暮らしを始めました。"}`
  }[n.id];
  $("#dialog").innerHTML=`<h2>${n.name} <span class="small">· ${n.role}</span></h2><p>${intro}</p><div id="chatLog"><div class="msg">${intro}</div></div><div class="row"><input id="chatInput" placeholder="住人に話しかける…" maxlength="180"><button class="primary" id="sendChat">送信</button></div><div class="chips"><span class="chip">街のこと</span><span class="chip">作品の相談</span><span class="chip">今日の目標</span></div><button id="closeDialog" style="width:100%;margin-top:8px">閉じる</button>`;
  $("#dialogBackdrop").classList.add("open");
@@ -513,6 +516,50 @@ function societyPanel(){
  });
  $("#societyClose").onclick=closeDrawer;
 }
+
+// NOVA 0.7: portable local backups; no login, cloud or server storage.
+function backupData(){
+ return {format:"nova-world-save",version:1,exportedAt:new Date().toISOString(),
+  data:{credits:state.credits,items:state.items,sold:state.sold,memories:state.memories,
+        missions:state.missions,visited:state.visited,plot:state.plot}};
+}
+function validateBackup(b){
+ if(!b||b.format!=="nova-world-save"||b.version!==1||!b.data||typeof b.data!=="object")throw Error("NOVA WORLDのバックアップ形式ではありません");
+ const d=b.data;
+ if(!Array.isArray(d.items)||d.items.length>300||!Number.isFinite(d.credits)||d.credits<0||d.credits>1e8)throw Error("データ形式または容量が不正です");
+ for(const it of d.items){
+  if(!it||typeof it.id!=="string"||it.id.length>100||typeof it.name!=="string"||it.name.length>120||typeof it.type!=="string"||it.type.length>60)throw Error("作品データが不正です");
+  if(!Number.isFinite(it.x||0)||!Number.isFinite(it.z||0)||Math.abs(it.x||0)>100||Math.abs(it.z||0)>100)throw Error("作品の位置が不正です");
+ }
+ for(const k of ["sold","memories","missions","visited"]){
+  if(d[k]===null||typeof d[k]!=="object")throw Error("保存データが不正です");
+ }
+ return d;
+}
+function backupPanel(){
+ let html='<h2>☁ 世界データの保存と復元</h2><p>作品・NOVA・ミッション・住人との会話記録をJSONファイルに保存できます。別の端末へ移す際に利用できます。</p>';
+ html+='<button class="primary" id="exportBackup" style="width:100%">バックアップをダウンロード</button><button id="importBackup" style="width:100%;margin-top:8px">バックアップを読み込む</button><input type="file" id="backupFile" accept=".json,application/json" style="display:none"><p class="small">※ 読み込みは現在の端末データを上書きします。先にバックアップを取ってください。会話記録には個人的な内容が含まれる場合があります。ファイルは公開しないでください。</p><p class="small">0.7ではクラウド同期・ユーザー登録・他人への公開はまだ実装していません。</p><button id="closeBackup" style="width:100%">閉じる</button>';
+ openDrawer(html);
+ $("#exportBackup").onclick=()=>{
+  const blob=new Blob([JSON.stringify(backupData(),null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="nova-world-backup-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);toast("バックアップを保存しました");
+ };
+ $("#importBackup").onclick=()=>$("#backupFile").click();
+ $("#backupFile").onchange=async e=>{
+  const f=e.target.files?.[0];if(!f)return;
+  if(f.size>2*1024*1024){toast("ファイルが大きすぎます（上限2MB）");return}
+  try{
+   const d=validateBackup(JSON.parse(await f.text()));
+   if(!confirm("現在の作品・NOVA・会話記録をバックアップの内容で上書きします。続けますか？"))return;
+   const payload={credits:d.credits,items:d.items,sold:d.sold||[],memories:d.memories||{},missions:d.missions||{},visited:d.visited||{},plot:d.plot||{x:43,z:43}};
+   localStorage.setItem("nova-world-save",JSON.stringify(payload));
+   alert("復元しました。画面を再読み込みします。");location.reload();
+  }catch(err){alert("読み込みできませんでした："+err.message)}
+ };
+ $("#closeBackup").onclick=closeDrawer;
+}
+$("#backupBtn").onclick=backupPanel;
+
 $("#societyBtn").onclick=societyPanel;
 
 $("#plotBtn").onclick=plotPanel;
