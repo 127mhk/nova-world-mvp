@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#101d26">
-<title>NOVA WORLD — Prototype 0.4</title>
+<title>NOVA WORLD — Prototype 0.5</title>
 <style>
 :root{--bg:#101d26;--panel:rgba(12,25,34,.88);--line:rgba(201,231,221,.22);--mint:#b7ead8;--gold:#f2ca82;--text:#f2f6f4;--muted:#b7c8c9}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d26;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
@@ -43,13 +43,14 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.4</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.5</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
-<div id="hint" class="panel">NOVA CENTRAL · ミッションに挑戦しよう</div>
+<div id="hint" class="panel">NOVA CENTRAL · 自分の土地を作ろう</div>
 <div id="district" class="panel">◉ NOVA CENTRAL</div>
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
+  <button class="action" id="plotBtn">⌂ マイ土地</button>
   <button class="action" id="missionBtn">◎ ミッション</button>
   <button class="action" id="talkBtn">💬 住人と話す</button>
   <button class="action" id="createBtn">✧ 作品を創作</button>
@@ -57,7 +58,7 @@ input:focus,textarea:focus{border-color:var(--mint)}
   <button class="action" id="inventoryBtn">▦ マイ作品</button>
 </div>
 <div id="drawer" class="panel"></div>
-<div id="bottomNote">左パッドで移動 · 画面ドラッグで視点変更 · ミッションでNOVAを獲得</div>
+<div id="bottomNote">左パッドで移動 · マイ土地で建築 · ミッションでNOVAを獲得</div>
 <div id="dialogBackdrop"><div id="dialog" class="panel"></div></div>
 <div id="toast"></div>
 <script type="importmap">
@@ -68,7 +69,7 @@ import * as THREE from "three";
 
 const $ = s => document.querySelector(s);
 const state = {
- missions: {}, visited: {},
+ missions: {}, visited: {}, plot: {x:43,z:43},
  credits: 100,
  items: [],
  sold: [],
@@ -81,9 +82,9 @@ const state = {
 }
 try {
  const saved = JSON.parse(localStorage.getItem("nova-world-save") || "null");
- if(saved){state.credits=saved.credits ?? 100;state.items=saved.items||[];state.sold=saved.sold||[];state.memories=saved.memories||{};state.missions=saved.missions||{};state.visited=saved.visited||{}}
+ if(saved){state.credits=saved.credits ?? 100;state.items=saved.items||[];state.sold=saved.sold||[];state.memories=saved.memories||{};state.missions=saved.missions||{};state.visited=saved.visited||{};state.plot=saved.plot||{x:43,z:43}}
 } catch(e){}
-function save(){try{localStorage.setItem("nova-world-save",JSON.stringify({credits:state.credits,items:state.items,sold:state.sold,memories:state.memories,missions:state.missions,visited:state.visited}))}catch(e){};$("#credits").textContent=state.credits}
+function save(){try{localStorage.setItem("nova-world-save",JSON.stringify({credits:state.credits,items:state.items,sold:state.sold,memories:state.memories,missions:state.missions,visited:state.visited,plot:state.plot}))}catch(e){};$("#credits").textContent=state.credits}
 function toast(s){const t=$("#toast");t.textContent=s;t.style.display="block";clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.style.display="none",2100)}
 $("#credits").textContent=state.credits;
 
@@ -112,6 +113,15 @@ function box(parent,w,h,d,material,x,y,z,cast=true){const m=new THREE.Mesh(new T
 function sphere(parent,r,material,x,y,z){const m=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
 function cylinder(parent,rt,rb,h,material,x,y,z,segments=12){const m=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segments),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
 const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),mats.grass);ground.rotation.x=-Math.PI/2;ground.position.y=-.08;ground.receiveShadow=true;scene.add(ground);
+// NOVA 0.5: private creative plot (local-only; not an ownership registry).
+const plotX=43,plotZ=43,plotSize=22;
+const plotGroup=new THREE.Group();plotGroup.position.set(plotX,0,plotZ);scene.add(plotGroup);
+const plotFloor=new THREE.Mesh(new THREE.PlaneGeometry(plotSize,plotSize),mat(0x547d76));plotFloor.rotation.x=-Math.PI/2;plotFloor.position.y=-.045;plotFloor.receiveShadow=true;plotGroup.add(plotFloor);
+for(const t of [-plotSize/2,plotSize/2]){
+ box(plotGroup,plotSize,.2,.22,mats.gold,0,.12,t,false);
+ box(plotGroup,.22,.2,plotSize,mats.gold,t,.12,0,false);
+}
+const plotPad=new THREE.Mesh(new THREE.CircleGeometry(2,28),mat(0x87c8bd,.45,.12));plotPad.rotation.x=-Math.PI/2;plotPad.position.set(0,.02,7);plotGroup.add(plotPad);
 // Plaza paths
 const path1=new THREE.Mesh(new THREE.PlaneGeometry(8,50),mats.path);path1.rotation.x=-Math.PI/2;path1.position.set(0,0,-1);scene.add(path1);
 const path2=new THREE.Mesh(new THREE.PlaneGeometry(38,7),mats.path);path2.rotation.x=-Math.PI/2;path2.position.set(0,.005,0);scene.add(path2);
@@ -433,6 +443,57 @@ function districtGuide(){
  });
  $("#backMissions").onclick=missionPanel;
 }
+
+// NOVA 0.5: editable plot, item placement, deletion, local persistence.
+const insidePlot=(x,z)=>Math.abs(x-plotX)<=plotSize/2-1&&Math.abs(z-plotZ)<=plotSize/2-1;
+function movePlayer(x,z){player.position.set(x,0,z);closeDrawer();toast("移動しました")}
+function plotPanel(){
+ let count=state.items.filter(it=>it.placed&&insidePlot(it.x||0,it.z||0)).length;
+ let html=`<h2>⌂ マイ土地</h2><p>あなた専用の試作エリアです。作品を配置して自分の空間を作れます。保存はこの端末内のみです。</p><p class="small">土地：22×22（試作用） · 配置済み ${count} 件</p>`;
+ html+='<button class="primary" id="goPlot" style="width:100%">マイ土地へ移動</button><button id="goCenter" style="width:100%;margin-top:8px">中央広場へ戻る</button><button id="plotItems" style="width:100%;margin-top:8px">作品の位置を編集</button><button id="plotNew" style="width:100%;margin-top:8px">新しい作品を作る</button>';
+ html+='<p class="small">マイ土地の中で「作品を創作」を押すと、その場所に作品を配置できます。作品の位置は編集画面で変更できます。</p>';
+ openDrawer(html);
+ $("#goPlot").onclick=()=>movePlayer(plotX,plotZ+6);
+ $("#goCenter").onclick=()=>movePlayer(0,8);
+ $("#plotItems").onclick=plotItemsPanel;
+ $("#plotNew").onclick=createPanel;
+}
+function plotItemsPanel(){
+ let html='<h2>⌂ 作品の配置編集</h2><p>作品を選び、マイ土地に移動・位置調整・削除できます。操作後は自動保存されます。</p>';
+ if(!state.items.length)html+='<p>作品がありません。「作品を創作」から作成してください。</p>';
+ for(const it of state.items)html+=`<div class="item" style="margin:7px 0"><b>${escapeHtml(it.name)}</b><span class="small">${it.placed?"配置中":"収納中"} · ${insidePlot(it.x||0,it.z||0)?"マイ土地":"街エリア"}</span><button data-edit="${escapeHtml(it.id)}">編集する</button></div>`;
+ html+='<button id="backPlot" style="width:100%;margin-top:8px">マイ土地へ戻る</button>';
+ openDrawer(html);
+ $("#drawer").querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>editItem(b.dataset.edit));
+ $("#backPlot").onclick=plotPanel;
+}
+function syncItemMesh(it){
+ const found=createdMeshes.find(e=>e.id===it.id);
+ if(found){found.mesh.visible=!!it.placed;found.mesh.position.set(it.x||0,0,it.z||0)}
+ else if(it.placed)placeCreated(it,false);
+}
+function editItem(id){
+ const it=state.items.find(x=>x.id===id);if(!it)return plotItemsPanel();
+ let html=`<h2>配置編集</h2><p>${escapeHtml(it.name)}</p><p class="small">マイ土地内で1単位ずつ移動できます。</p><button id="putOnPlot" style="width:100%">マイ土地の中央に配置</button><div class="row" style="justify-content:center;margin:9px 0"><button data-shift="0,-1">↑ 奥へ</button></div><div class="row" style="justify-content:center"><button data-shift="-1,0">← 左へ</button><button data-shift="1,0">右へ →</button></div><div class="row" style="justify-content:center;margin:9px 0"><button data-shift="0,1">↓ 手前へ</button></div><button id="toggleItem" style="width:100%">${it.placed?"作品を収納する":"作品を再配置する"}</button><button id="deleteItem" style="width:100%;margin-top:8px">作品を削除する</button><button id="backItems" style="width:100%;margin-top:8px">一覧へ戻る</button>`;
+ openDrawer(html);
+ $("#putOnPlot").onclick=()=>{it.x=plotX;it.z=plotZ;it.placed=true;syncItemMesh(it);save();toast("土地の中央に配置しました");editItem(id)};
+ $("#drawer").querySelectorAll("[data-shift]").forEach(b=>b.onclick=()=>{
+  if(!insidePlot(it.x||0,it.z||0)){toast("先にマイ土地へ配置してください");return}
+  const [dx,dz]=b.dataset.shift.split(",").map(Number);
+  if(!insidePlot(it.x+dx,it.z+dz)){toast("土地の外には移動できません");return}
+  it.x+=dx;it.z+=dz;it.placed=true;syncItemMesh(it);save();toast("位置を保存しました");
+ });
+ $("#toggleItem").onclick=()=>{it.placed=!it.placed;syncItemMesh(it);save();editItem(id)};
+ $("#deleteItem").onclick=()=>{
+  if(!confirm("この作品を削除しますか？"))return;
+  const idx=createdMeshes.findIndex(e=>e.id===id);
+  if(idx>=0){scene.remove(createdMeshes[idx].mesh);createdMeshes.splice(idx,1)}
+  state.items=state.items.filter(x=>x.id!==id);save();plotItemsPanel();toast("作品を削除しました");
+ };
+ $("#backItems").onclick=plotItemsPanel;
+}
+$("#plotBtn").onclick=plotPanel;
+
 $("#missionBtn").onclick=missionPanel;
 updateMissionBadge();
 
