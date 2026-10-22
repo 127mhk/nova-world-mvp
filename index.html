@@ -43,7 +43,7 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.1</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.2</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
 <div id="hint" class="panel">未知の街へようこそ。住人に話しかけ、作品を作ろう。</div>
@@ -86,7 +86,7 @@ $("#credits").textContent=state.credits;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9bc6ce);
-scene.fog = new THREE.Fog(0x9bc6ce, 24, 100);
+scene.fog = new THREE.FogExp2(0x9bc6ce, 0.011);
 const camera = new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,180);
 const renderer = new THREE.WebGLRenderer({antialias:true,alpha:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));
@@ -99,7 +99,7 @@ renderer.toneMappingExposure=1.05;
 $("#world").appendChild(renderer.domElement);
 
 scene.add(new THREE.HemisphereLight(0xdff7ff,0x52604a,2.1));
-const sun=new THREE.DirectionalLight(0xffe5b8,3.0);sun.position.set(-12,24,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);scene.add(sun);
+const sun=new THREE.DirectionalLight(0xffe5b8,3.0);sun.position.set(-12,24,10);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-35;sun.shadow.camera.right=35;sun.shadow.camera.top=35;sun.shadow.camera.bottom=-35;sun.shadow.bias=-0.0003;scene.add(sun);
 const mat=(color,roughness=.82,metalness=0)=>new THREE.MeshStandardMaterial({color,roughness,metalness});
 const mats={
  grass:mat(0x557d67), path:mat(0xc8b99a), stone:mat(0x8fa3a2), wall:mat(0xd9d4c4), dark:mat(0x2c4650), roof:mat(0x426a6b), glass:mat(0x7eb8bd,.3,.2),
@@ -124,6 +124,19 @@ function building(x,z,w,d,h,name,accent){
  box(g,1.05,1.8,.12,mats.wood,0,.9,d/2+.07);
  box(g,w*.75,.22,.3,mat(accent),0,h+.45,d/2+.03);
  const sign=box(g,w*.6,.45,.12,mat(accent),0,h*.77,d/2+.08,false);
+ // facade: window frames, sills, side windows, entrance canopy
+ for(const sx of [-1,1]){
+  box(g,.84,.065,.17,mats.white,sx*w*.27,h*.56-.54,d/2+.13,false);
+  box(g,.055,1.05,.14,mats.white,sx*w*.27,h*.56,d/2+.14,false);
+  box(g,.8,.05,.14,mats.white,sx*w*.27,h*.56,d/2+.14,false);
+  box(g,.68,.92,.06,mats.glass,sx*w/2+sx*.035,h*.55,0,false);
+ }
+ box(g,1.7,.14,1.05,mats.roof,0,1.94,d/2+.5);
+ box(g,.13,1.25,.13,mats.wood,-.75,.65,d/2+.65);
+ box(g,.13,1.25,.13,mats.wood,.75,.65,d/2+.65);
+ // low foundation and roof trim
+ box(g,w+.5,.22,d+.5,mats.stone,0,.1,0);
+ box(g,w+.48,.11,d+.48,mat(accent),0,h+.39,0);
  return g;
 }
 building(-10,-9,7,6,4.8,"WORKSHOP",0xc7a76e);
@@ -144,6 +157,60 @@ for(let i=0;i<14;i++){
  const m=new THREE.Mesh(new THREE.ConeGeometry(4+Math.random()*5,10+Math.random()*12,6),mat(i%2?0x799b9c:0x8caeae));
  m.position.set((i-7)*11,4,-47-Math.random()*15);m.rotation.y=Math.random();scene.add(m);
 }
+// Visual upgrade 0.2: lightweight, procedural environment, no paid assets.
+let seed=21977;function rnd(){seed=(seed*1664525+1013904223)>>>0;return seed/4294967296}
+const decor=new THREE.Group();scene.add(decor);
+const paving=mat(0xb9b0a0),curb=mat(0xded8c7),metal=mat(0x425b60,.46,.48),flowerPink=mat(0xd8919a),flowerGold=mat(0xecc77c),bark=mat(0x6c5543);
+// Cobblestone edge and center promenade
+for(let z=-24;z<24;z+=2.15){for(const side of [-1,1]){
+ box(decor,.18,.075,1.7,curb,side*4.05,.045,z,false);
+ if(z%4<2)box(decor,.34,.025,.38,paving,side*3.65,.03,z,false);
+}}
+for(let x=-18;x<19;x+=2.1){for(const side of [-1,1])box(decor,1.75,.08,.18,curb,x,.05,side*3.55,false)}
+// Modern lamp posts; use emissive globes instead of costly point lights.
+const lampGlow=new THREE.MeshStandardMaterial({color:0xffdf9c,emissive:0xffc46c,emissiveIntensity:1.25,roughness:.45});
+function streetLamp(x,z){const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
+ cylinder(g,.10,.16,2.8,metal,0,1.4,0,10);
+ sphere(g,.27,lampGlow,0,2.95,0);
+ cylinder(g,.32,.18,.14,metal,0,3.24,0,12);
+ cylinder(g,.3,.4,.16,mats.stone,0,.09,0,12);
+}
+for(const z of [-20,-12,12,20]){streetLamp(-5.5,z);streetLamp(5.5,z)}
+// Benches, planting beds and stone planters.
+function bench(x,z,rot=0){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=rot;decor.add(g);
+ for(let s of [-1,1]){box(g,.13,.75,.55,metal,s*.82,.38,0);box(g,.13,.75,.2,metal,s*.82,.65,-.25)}
+ for(let i=-1;i<=1;i++)box(g,1.95,.12,.18,mats.wood,0,.72,i*.21);
+ for(let i=0;i<3;i++)box(g,1.95,.14,.13,mats.wood,0,1.04+i*.23,-.3);
+}
+bench(-5.9,5.3,Math.PI/2);bench(5.9,5.3,-Math.PI/2);bench(-5.9,-5.2,Math.PI/2);bench(5.9,-5.2,-Math.PI/2);
+function planter(x,z){const g=new THREE.Group();g.position.set(x,0,z);decor.add(g);
+ cylinder(g,.67,.75,.45,mats.stone,0,.23,0,12);
+ cylinder(g,.59,.59,.035,mat(0x4b6650),0,.47,0,12);
+ for(let i=0;i<7;i++){const a=i*Math.PI*2/7;const xx=Math.cos(a)*.38,zz=Math.sin(a)*.38;
+ sphere(g,.16,i%2?flowerPink:flowerGold,xx,.69+(i%3)*.04,zz);
+ cylinder(g,.035,.05,.32,mats.leaf,xx,.54,zz,6);
+ }}
+for(const [x,z] of [[-6,-7],[6,-7],[-6,7],[6,7],[-16,-1],[16,-1]])planter(x,z);
+// Flower patches on grass: limited mesh count for Android performance.
+for(let i=0;i<72;i++){const x=(rnd()-.5)*56,z=(rnd()-.5)*54;
+ if(Math.abs(x)<19&&Math.abs(z)<15)continue;
+ const clump=new THREE.Group();clump.position.set(x,0,z);decor.add(clump);
+ const bloom=i%3===0?flowerGold:flowerPink;
+ for(let j=0;j<3;j++){const a=j*2.1;
+ cylinder(clump,.025,.045,.24,mats.leaf,Math.cos(a)*.22,.13,Math.sin(a)*.22,5);
+ sphere(clump,.085,bloom,Math.cos(a)*.22,.28,Math.sin(a)*.22);
+ }
+}
+// Low-poly layered clouds in the distant sky.
+const clouds=[];const cloudMat=new THREE.MeshBasicMaterial({color:0xf5f4eb,transparent:true,opacity:.57,depthWrite:false});
+for(let i=0;i<8;i++){const c=new THREE.Group();c.position.set((i-4)*15,16+(i%3)*2,-42-i*2);scene.add(c);
+ for(let j=0;j<4;j++){const puff=new THREE.Mesh(new THREE.SphereGeometry(1.5+(j%2)*.6,9,7),cloudMat);puff.scale.set(1.55,.43,.8);puff.position.x=(j-1.5)*1.8;c.add(puff)}clouds.push(c)}
+// A gently animated fountain surface.
+const waterDisk=new THREE.Mesh(new THREE.CircleGeometry(1.42,32),new THREE.MeshStandardMaterial({color:0x73bfd0,roughness:.18,metalness:.16,transparent:true,opacity:.83}));
+waterDisk.rotation.x=-Math.PI/2;waterDisk.position.set(0,.575,0);fountain.add(waterDisk);
+const rippleMat=new THREE.MeshBasicMaterial({color:0xdafaff,transparent:true,opacity:.65,depthWrite:false});
+const ripples=[];
+for(let i=0;i<3;i++){const r=new THREE.Mesh(new THREE.RingGeometry(.38,.42,40),rippleMat.clone());r.rotation.x=-Math.PI/2;r.position.set(0,.584+i*.002,0);fountain.add(r);ripples.push(r)}
 // avatar
 const player=new THREE.Group();scene.add(player);player.position.set(0,0,8);
 const avatarMat=mat(0x243e4b),skin=mat(0xd5aa86),cape=mat(0xb7ead8);
@@ -279,6 +346,8 @@ function animate(now){
  const desired=new THREE.Vector3(player.position.x-Math.sin(targetYaw)*camDist,player.position.y+camHeight,player.position.z-Math.cos(targetYaw)*camDist);
  camera.position.lerp(desired,.09);camera.lookAt(player.position.x,1.2,player.position.z);
  for(const n of npcs){n.halo.rotation.z+=dt*.4;n.group.lookAt(player.position.x,0,player.position.z)}
+ for(let i=0;i<ripples.length;i++){const p=((now*.00035+i/3)%1);ripples[i].scale.setScalar(.65+p*2.4);ripples[i].material.opacity=.6*(1-p)}
+ for(let i=0;i<clouds.length;i++)clouds[i].position.x+=dt*.11;
  renderer.render(scene,camera);
 }
 requestAnimationFrame(animate);
