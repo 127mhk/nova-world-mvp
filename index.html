@@ -43,13 +43,14 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.5</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.6</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
-<div id="hint" class="panel">NOVA CENTRAL · 自分の土地を作ろう</div>
+<div id="hint" class="panel">NOVA WORLD · 住人と暮らす世界へ</div>
 <div id="district" class="panel">◉ NOVA CENTRAL</div>
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
+  <button class="action" id="societyBtn">♧ AI社会</button>
   <button class="action" id="plotBtn">⌂ マイ土地</button>
   <button class="action" id="missionBtn">◎ ミッション</button>
   <button class="action" id="talkBtn">💬 住人と話す</button>
@@ -294,6 +295,7 @@ box(player,.18,.6,.18,avatarMat,-.2,.18,0);box(player,.18,.6,.18,avatarMat,.2,.1
 const facing=new THREE.Object3D();facing.position.set(0,0,1);player.add(facing);
 // NPCs
 const npcs=[];
+const societyStart=performance.now();
 function makeNpc(id,name,role,x,z,color,personality){
  const g=new THREE.Group();g.position.set(x,0,z);scene.add(g);
  const bodyMat=mat(color),headMat=mat(0xe0b99a);
@@ -301,11 +303,13 @@ function makeNpc(id,name,role,x,z,color,personality){
  sphere(g,.045,mat(0x1a2830),-.08,1.5,.24);sphere(g,.045,mat(0x1a2830),.08,1.5,.24);
  cylinder(g,.04,.06,.36,mat(0xddd8bd),-.28,.62,0);cylinder(g,.04,.06,.36,mat(0xddd8bd),.28,.62,0);
  const halo=new THREE.Mesh(new THREE.TorusGeometry(.38,.035,8,24),mat(0xb7ead8,.3,.3));halo.position.y=1.95;halo.rotation.x=Math.PI/2;g.add(halo);
- npcs.push({id,name,role,personality,group:g,halo});
+ npcs.push({id,name,role,personality,group:g,halo,homeX:x,homeZ:z,activity:"仕事中",phase:Math.random()*6.28});
 }
 makeNpc("mira","MIRA","街の案内人",-3,2,0x6f9f9c,"親切で好奇心旺盛。街の未来を気にしている");
 makeNpc("ren","REN","工房の職人",-10,-3,0xb98b60,"寡黙だが作品を見る目が鋭い。新しい家具が好き");
 makeNpc("sol","SOL","マーケット商人",9,-3,0x9b8bc3,"陽気で商売上手。街に役立つ作品を探している");
+makeNpc("aya","AYA","自然地区の研究員",-17,-17,0x72a78b,"穏やかで自然の観察が好き");
+makeNpc("leo","LEO","住宅地区の住人",-17,15,0x8b9cc5,"明るく、新しい街の仲間に興味がある");
 
 const createdMeshes=[];
 function colorFor(text){if(/青|ブルー|水色|光る|氷/.test(text))return 0x69b9d0;if(/赤|朱|ピンク|花/.test(text))return 0xd78d9c;if(/金|黄|黄金|光/.test(text))return 0xe3bd68;if(/紫|むらさき/.test(text))return 0x9b8bd0;if(/白|雪/.test(text))return 0xecebe2;if(/黒|暗/.test(text))return 0x34434a;if(/緑|木|植物|葉/.test(text))return 0x76a77a;return 0xb8c6c0}
@@ -324,7 +328,7 @@ function placeCreated(item,atPlayer=true){
  const mesh=buildItemMesh(item.type,item.color);const forward=new THREE.Vector3(Math.sin(player.rotation.y),0,Math.cos(player.rotation.y));
  mesh.position.copy(player.position).add(forward.multiplyScalar(atPlayer?2.2:0));mesh.position.y=0;
  if(!atPlayer){mesh.position.set(item.x||0,0,item.z||0)}
- scene.add(mesh);createdMeshes.push({id:item.id,mesh});return mesh;
+ scene.add(mesh);if(atPlayer){item.x=mesh.position.x;item.z=mesh.position.z;item.placed=true}createdMeshes.push({id:item.id,mesh});return mesh;
 }
 state.items.forEach(it=>{if(it.placed)placeCreated(it,false)});
 
@@ -492,6 +496,25 @@ function editItem(id){
  };
  $("#backItems").onclick=plotItemsPanel;
 }
+
+// NOVA 0.6: offline society simulation (not a generative AI service).
+function societyPanel(){
+ let html='<h2>♧ NOVA AI社会</h2><p>住人たちは街の中で仕事・散歩・休憩を繰り返します。これは無料で動く簡易生活シミュレーションです。</p>';
+ for(const n of npcs){
+  const count=(state.memories[n.id]||{}).count||0;
+  html+=`<div class="item" style="margin:7px 0"><b>${n.name} · ${n.role}</b><span class="small">${n.activity} · 会話記録 ${count}回</span><button data-npc="${n.id}">住人のところへ</button></div>`;
+ }
+ html+='<p class="small">実際の生成AI、他プレイヤーとの共有、クラウド記憶は未実装です。</p><button id="societyClose" style="width:100%">閉じる</button>';
+ openDrawer(html);
+ $("#drawer").querySelectorAll("[data-npc]").forEach(b=>b.onclick=()=>{
+  const n=npcs.find(v=>v.id===b.dataset.npc);if(!n)return;
+  player.position.set(n.group.position.x+1.7,0,n.group.position.z+1.7);
+  closeDrawer();toast(n.name+"の近くへ移動しました");
+ });
+ $("#societyClose").onclick=closeDrawer;
+}
+$("#societyBtn").onclick=societyPanel;
+
 $("#plotBtn").onclick=plotPanel;
 
 $("#missionBtn").onclick=missionPanel;
@@ -521,14 +544,23 @@ function animate(now){
  const len=Math.hypot(x,z);if(len>1){x/=len;z/=len}
  const speed=5.2;
  if(len>.08){const dx=(x*Math.cos(state.yaw)+z*Math.sin(state.yaw))*speed*dt;const dz=(-x*Math.sin(state.yaw)+z*Math.cos(state.yaw))*speed*dt;player.position.x+=dx;player.position.z+=dz;player.rotation.y=Math.atan2(dx,dz)}
- player.position.x=THREE.MathUtils.clamp(player.position.x,-29,29);player.position.z=THREE.MathUtils.clamp(player.position.z,-29,29);
+ player.position.x=THREE.MathUtils.clamp(player.position.x,-58,58);player.position.z=THREE.MathUtils.clamp(player.position.z,-58,58);
  const px=player.position.x,pz=player.position.z;
- const zone=Math.abs(px)<6||Math.abs(pz)<6?"◉ NOVA CENTRAL · 中央広場":(px>0?(pz<0?"◈ NOVA CENTRAL · 近未来都市":"◇ CREATOR STREET · 商業地区"):(pz<0?"❋ GREEN FRONTIER · 自然地区":"⌂ LIFE DISTRICT · 住宅地区"));
+ const zone=insidePlot(px,pz)?"⌂ MY PLOT · マイ土地":Math.abs(px)<6||Math.abs(pz)<6?"◉ NOVA CENTRAL · 中央広場":(px>0?(pz<0?"◈ NOVA CENTRAL · 近未来都市":"◇ CREATOR STREET · 商業地区"):(pz<0?"❋ GREEN FRONTIER · 自然地区":"⌂ LIFE DISTRICT · 住宅地区"));
  if(zone!==state.currentZone){state.currentZone=zone;$("#district").textContent=zone;const area=px>6?(pz< -6?"future":pz>6?"commerce":"central"):px< -6?(pz< -6?"nature":pz>6?"residential":"central"):"central";missionEvent("visit",area)}
  const targetYaw=state.yaw;const camDist=7.2,camHeight=4.1;
  const desired=new THREE.Vector3(player.position.x-Math.sin(targetYaw)*camDist,player.position.y+camHeight,player.position.z-Math.cos(targetYaw)*camDist);
  camera.position.lerp(desired,.09);camera.lookAt(player.position.x,1.2,player.position.z);
- for(const n of npcs){n.halo.rotation.z+=dt*.4;n.group.lookAt(player.position.x,0,player.position.z)}
+ for(const n of npcs){
+  n.halo.rotation.z+=dt*.4;
+  const t=(now-societyStart)*.00011+n.phase;
+  const phase=(Math.floor(t/1.5)%3);
+  n.activity=["仕事中","散歩中","休憩中"][phase];
+  const r=phase===1?2.4:phase===2?.65:1.1;
+  n.group.position.x=n.homeX+Math.cos(t*2.1)*r;
+  n.group.position.z=n.homeZ+Math.sin(t*2.1)*r;
+  n.group.lookAt(player.position.x,0,player.position.z);
+ }
  for(let i=0;i<ripples.length;i++){const p=((now*.00035+i/3)%1);ripples[i].scale.setScalar(.65+p*2.4);ripples[i].material.opacity=.6*(1-p)}
  for(let i=0;i<clouds.length;i++)clouds[i].position.x+=dt*.11;
  renderer.render(scene,camera);
