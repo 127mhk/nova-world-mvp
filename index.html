@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#101d26">
-<title>NOVA WORLD — Prototype 0.3</title>
+<title>NOVA WORLD — Prototype 0.4</title>
 <style>
 :root{--bg:#101d26;--panel:rgba(12,25,34,.88);--line:rgba(201,231,221,.22);--mint:#b7ead8;--gold:#f2ca82;--text:#f2f6f4;--muted:#b7c8c9}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d26;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
@@ -17,12 +17,12 @@
 #leftControls{position:fixed;left:14px;bottom:20px;display:flex;align-items:end;gap:10px}
 #stick{width:112px;height:112px;border-radius:50%;border:1px solid #c4e6da55;background:#12273399;position:relative;touch-action:none}
 #nub{position:absolute;width:42px;height:42px;left:34px;top:34px;border-radius:50%;background:#b7ead8cc;border:2px solid #e5fff5;box-shadow:0 2px 12px #0006}
-#actions{position:fixed;right:14px;bottom:20px;display:flex;flex-direction:column;gap:8px}
+#actions{position:fixed;right:14px;bottom:20px;display:flex;flex-direction:column;gap:7px}
 button{font:inherit;color:var(--text);border:1px solid var(--line);background:#19313d;border-radius:12px;padding:11px 13px;cursor:pointer}
 button:active{transform:scale(.98);background:#294958}
 button.primary{background:#b7ead8;color:#10222a;border-color:#b7ead8;font-weight:700}
 button.gold{border-color:#d6b76e;color:#f2d69c}
-.action{min-width:98px;font-size:12px}
+.action{min-width:98px;font-size:12px;padding:9px 11px}
 #bottomNote{position:fixed;left:50%;bottom:6px;transform:translateX(-50%);font-size:10px;color:#d0dfdc99;white-space:nowrap;pointer-events:none}
 #drawer{position:fixed;left:12px;right:12px;bottom:145px;max-height:48vh;overflow:auto;padding:15px;display:none}
 #drawer.open{display:block}
@@ -43,20 +43,21 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.3</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.4</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
-<div id="hint" class="panel">NOVA CENTRAL · 4つの地区を探索しよう</div>
+<div id="hint" class="panel">NOVA CENTRAL · ミッションに挑戦しよう</div>
 <div id="district" class="panel">◉ NOVA CENTRAL</div>
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
+  <button class="action" id="missionBtn">◎ ミッション</button>
   <button class="action" id="talkBtn">💬 住人と話す</button>
   <button class="action" id="createBtn">✧ 作品を創作</button>
   <button class="action" id="shopBtn">◇ マーケット</button>
   <button class="action" id="inventoryBtn">▦ マイ作品</button>
 </div>
 <div id="drawer" class="panel"></div>
-<div id="bottomNote">左パッドで移動 · 画面ドラッグで視点変更 · 4地区を探索</div>
+<div id="bottomNote">左パッドで移動 · 画面ドラッグで視点変更 · ミッションでNOVAを獲得</div>
 <div id="dialogBackdrop"><div id="dialog" class="panel"></div></div>
 <div id="toast"></div>
 <script type="importmap">
@@ -67,6 +68,7 @@ import * as THREE from "three";
 
 const $ = s => document.querySelector(s);
 const state = {
+ missions: {}, visited: {},
  credits: 100,
  items: [],
  sold: [],
@@ -79,9 +81,9 @@ const state = {
 }
 try {
  const saved = JSON.parse(localStorage.getItem("nova-world-save") || "null");
- if(saved){state.credits=saved.credits ?? 100;state.items=saved.items||[];state.sold=saved.sold||[];state.memories=saved.memories||{}}
+ if(saved){state.credits=saved.credits ?? 100;state.items=saved.items||[];state.sold=saved.sold||[];state.memories=saved.memories||{};state.missions=saved.missions||{};state.visited=saved.visited||{}}
 } catch(e){}
-function save(){try{localStorage.setItem("nova-world-save",JSON.stringify({credits:state.credits,items:state.items,sold:state.sold,memories:state.memories}))}catch(e){};$("#credits").textContent=state.credits}
+function save(){try{localStorage.setItem("nova-world-save",JSON.stringify({credits:state.credits,items:state.items,sold:state.sold,memories:state.memories,missions:state.missions,visited:state.visited}))}catch(e){};$("#credits").textContent=state.credits}
 function toast(s){const t=$("#toast");t.textContent=s;t.style.display="block";clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.style.display="none",2100)}
 $("#credits").textContent=state.credits;
 
@@ -323,6 +325,7 @@ function talk(){
  const n=nearestNpc();
  if(!n){toast("住人の近くまで移動してください");return}
  state.chatNpc=n;
+ missionEvent("talk",n.id);
  const mem=state.memories[n.id]||{count:0,last:""};
  const intro={
  mira:`こんにちは！私は${n.name}。この街の案内人です。${mem.count?`また会えましたね。前に「${mem.last}」について話しましたね。`:"この街は、創作者のアイデアで少しずつ変わっていきます。"}何を作ってみたいですか？`,
@@ -353,7 +356,7 @@ function createPanel(){
  $("#generate").onclick=()=>{
   const text=$("#prompt").value.trim();if(!text){toast("作りたいものを入力してください");return}
   const type=inferType(text),color=colorFor(text),item={id:"i"+Date.now(),name:text,type,color,price:20,placed:true,x:player.position.x+Math.sin(player.rotation.y)*2.2,z:player.position.z+Math.cos(player.rotation.y)*2.2};
-  state.items.push(item);placeCreated(item,true);save();renderInventory();
+  state.items.push(item);placeCreated(item,true);missionEvent("create",type);save();renderInventory();
   toast("作品を生成しました！ マイ作品から出品できます。");
   openDrawer(`<h2>作品が完成しました</h2><p>「${escapeHtml(text)}」を街に配置しました。マーケットから出品できます。</p><button class="primary" id="toInventory" style="width:100%">マイ作品を見る</button><button id="again" style="width:100%;margin-top:8px">続けて創作</button>`);
   $("#toInventory").onclick=renderInventory;$("#again").onclick=createPanel;
@@ -372,7 +375,7 @@ function renderInventory(){
 }
 function renderShop(){
  closeDrawer();let listed=state.items.filter(x=>x.listed);
- let html=`<h2>◇ NOVAマーケット</h2><p>街の創作者が作った作品を、仮想通貨NOVAで購入するテスト用ショップです。</p>`;
+ let html=`<h2>◇ NOVAマーケット</h2><p>街の創作者が作った作品を、ゲーム内ポイントNOVAで購入するテスト用ショップです。</p>`;
  if(!listed.length)html+=`<p>現在出品中の作品はありません。自分の作品を作って出品してみましょう。</p>`;
  html+='<div id="items">';
  for(const it of listed){html+=`<div class="item"><b>${escapeHtml(it.name)}</b><span class="small">${it.price} NOVA</span><button data-buy="${it.id}">購入する</button></div>`}
@@ -380,6 +383,59 @@ function renderShop(){
  openDrawer(html);
  $("#drawer").querySelectorAll("[data-buy]").forEach(b=>b.onclick=()=>{const it=state.items.find(x=>x.id===b.dataset.buy);if(!it)return;if(state.credits<it.price){toast("NOVAが足りません");return}state.credits-=it.price;it.listed=false;state.sold.push({name:it.name,price:it.price});save();renderShop();toast("購入しました（試作用）")});
 }
+
+// NOVA 0.4: single-device mission loop. All rewards are demo-only NOVA points.
+const missions=[
+ {id:"hello",name:"はじめての交流",detail:"近くの案内人MIRAと話す",kind:"talk",target:"mira",reward:20},
+ {id:"maker",name:"街のクリエイター",detail:"作品を1つ作って街に配置する",kind:"create",target:"any",reward:30},
+ {id:"explore",name:"自然地区の探検",detail:"GREEN FRONTIERを訪れる",kind:"visit",target:"nature",reward:25},
+ {id:"shopping",name:"商業地区の探索",detail:"CREATOR STREETを訪れる",kind:"visit",target:"commerce",reward:25}
+];
+function missionEvent(kind,target){
+ let changed=false;
+ for(const m of missions){
+  if(state.missions[m.id])continue;
+  if(m.kind===kind&&(m.target===target||m.target==="any")){
+   state.missions[m.id]=true;state.credits+=m.reward;changed=true;
+   toast("ミッション達成！ +"+m.reward+" NOVA");
+  }
+ }
+ if(changed){save();updateMissionBadge()}
+}
+function updateMissionBadge(){
+ const count=missions.filter(m=>state.missions[m.id]).length;
+ $("#missionBtn").textContent="◎ ミッション "+count+"/"+missions.length;
+}
+function missionPanel(){
+ const count=missions.filter(m=>state.missions[m.id]).length;
+ let html=`<h2>◎ NOVA ミッション</h2><p>住人と交流し、作品を作り、4つの地区を探索しましょう。報酬は試作用のNOVAポイントです。</p><p class="small">達成 ${count} / ${missions.length}　·　端末内に自動保存</p>`;
+ for(const m of missions)html+=`<div class="item" style="margin:8px 0"><b>${state.missions[m.id]?"✓ ":"○ "}${m.name}</b><span class="small">${m.detail} · ${m.reward} NOVA ${state.missions[m.id]?"（受取済）":""}</span></div>`;
+ html+=`<p class="small">地区案内：中央から北東＝近未来、南東＝商業、南西＝住宅、北西＝自然。左のパッドで移動できます。</p><button id="districtGuide" style="width:100%">地区への移動ガイド</button><button id="closeMissions" style="width:100%;margin-top:8px">閉じる</button>`;
+ openDrawer(html);
+ $("#closeMissions").onclick=closeDrawer;
+ $("#districtGuide").onclick=districtGuide;
+}
+function districtGuide(){
+ const areas=[
+  {name:"中央広場",x:0,z:8},
+  {name:"近未来都市",x:16,z:-14},
+  {name:"商業地区",x:16,z:15},
+  {name:"住宅地区",x:-16,z:15},
+  {name:"自然地区",x:-17,z:-18}
+ ];
+ let html="<h2>◇ 地区ナビゲーション</h2><p>地区を選ぶと、その地区の道路沿いへ移動します。4地区の探索に利用できます。</p>";
+ for(const a of areas)html+=`<button class="goDistrict" data-x="${a.x}" data-z="${a.z}" style="width:100%;margin:4px 0">${a.name}へ移動</button>`;
+ html+='<button id="backMissions" style="width:100%;margin-top:8px">ミッションへ戻る</button>';
+ openDrawer(html);
+ $("#drawer").querySelectorAll(".goDistrict").forEach(b=>b.onclick=()=>{
+  player.position.set(Number(b.dataset.x),0,Number(b.dataset.z));
+  closeDrawer();toast("地区へ移動しました");
+ });
+ $("#backMissions").onclick=missionPanel;
+}
+$("#missionBtn").onclick=missionPanel;
+updateMissionBadge();
+
 $("#talkBtn").onclick=talk;$("#createBtn").onclick=createPanel;$("#shopBtn").onclick=renderShop;$("#inventoryBtn").onclick=renderInventory;
 $("#hint").onclick=()=>toast("広場の住人に近づいて「住人と話す」を押してみましょう");
 $("#dialogBackdrop").addEventListener("click",e=>{if(e.target===$("#dialogBackdrop"))$("#dialogBackdrop").classList.remove("open")});
@@ -407,7 +463,7 @@ function animate(now){
  player.position.x=THREE.MathUtils.clamp(player.position.x,-29,29);player.position.z=THREE.MathUtils.clamp(player.position.z,-29,29);
  const px=player.position.x,pz=player.position.z;
  const zone=Math.abs(px)<6||Math.abs(pz)<6?"◉ NOVA CENTRAL · 中央広場":(px>0?(pz<0?"◈ NOVA CENTRAL · 近未来都市":"◇ CREATOR STREET · 商業地区"):(pz<0?"❋ GREEN FRONTIER · 自然地区":"⌂ LIFE DISTRICT · 住宅地区"));
- if(zone!==state.currentZone){state.currentZone=zone;$("#district").textContent=zone}
+ if(zone!==state.currentZone){state.currentZone=zone;$("#district").textContent=zone;const area=px>6?(pz< -6?"future":pz>6?"commerce":"central"):px< -6?(pz< -6?"nature":pz>6?"residential":"central"):"central";missionEvent("visit",area)}
  const targetYaw=state.yaw;const camDist=7.2,camHeight=4.1;
  const desired=new THREE.Vector3(player.position.x-Math.sin(targetYaw)*camDist,player.position.y+camHeight,player.position.z-Math.cos(targetYaw)*camDist);
  camera.position.lerp(desired,.09);camera.lookAt(player.position.x,1.2,player.position.z);
