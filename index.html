@@ -73,8 +73,8 @@ import * as THREE from "three";
 const $ = s => document.querySelector(s);
 // Set only Supabase Project URL and publishable key (sb_publishable_...).
 // NEVER paste secret keys or service_role keys into public GitHub Pages code.
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
-const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+const SUPABASE_URL = "https://ozwosnxsiaizsztmgtyk.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_S25vIXyM9fyTzMe-vJv-xA_qdv8_mWW";
 const cloudConfigured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_PUBLISHABLE_KEY.startsWith("sb_publishable_");
 let supabaseClient = null;
 let cloudUser = null;
