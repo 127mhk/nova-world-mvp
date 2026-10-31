@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="theme-color" content="#101d26">
-<title>NOVA WORLD — Prototype 0.5</title>
+<title>NOVA WORLD — Prototype 0.8</title>
 <style>
 :root{--bg:#101d26;--panel:rgba(12,25,34,.88);--line:rgba(201,231,221,.22);--mint:#b7ead8;--gold:#f2ca82;--text:#f2f6f4;--muted:#b7c8c9}
 *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#101d26;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;touch-action:none}
@@ -43,7 +43,7 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <body>
 <div id="world"></div>
 <div id="topbar">
-  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.7</small></div>
+  <div class="brand panel"><b>NOVA WORLD</b><small>AI SOCIETY · PROTOTYPE 0.8</small></div>
   <div id="wallet" class="panel">✦ <span id="credits">100</span> NOVA</div>
 </div>
 <div id="hint" class="panel">NOVA WORLD · 世界を保存して未来へ</div>
@@ -51,6 +51,7 @@ input:focus,textarea:focus{border-color:var(--mint)}
 <div id="leftControls"><div id="stick"><div id="nub"></div></div></div>
 <div id="actions">
   <button class="action" id="backupBtn">☁ 世界データ</button>
+  <button class="action" id="cloudBtn">🔐 クラウド</button>
   <button class="action" id="societyBtn">♧ AI社会</button>
   <button class="action" id="plotBtn">⌂ マイ土地</button>
   <button class="action" id="missionBtn">◎ ミッション</button>
@@ -70,6 +71,82 @@ input:focus,textarea:focus{border-color:var(--mint)}
 import * as THREE from "three";
 
 const $ = s => document.querySelector(s);
+// Set only Supabase Project URL and publishable key (sb_publishable_...).
+// NEVER paste secret keys or service_role keys into public GitHub Pages code.
+const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+const cloudConfigured = /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL) && SUPABASE_PUBLISHABLE_KEY.startsWith("sb_publishable_");
+let supabaseClient = null;
+let cloudUser = null;
+let cloudBusy = false;
+const CLOUD_MAX_BYTES = 1024*1024;
+async function initCloud(){
+ if(!cloudConfigured)return;
+ try{
+  const {createClient} = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm");
+  supabaseClient=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const {data,error}=await supabaseClient.auth.getUser();if(error && error.name!=="AuthSessionMissingError")console.warn("Cloud auth",error.message);
+  cloudUser=data?.user||null;
+  supabaseClient.auth.onAuthStateChange((_event,session)=>{cloudUser=session?.user||null;updateCloudButton()});
+  updateCloudButton();
+ }catch(e){console.warn("Supabase unavailable",e);toast("クラウド接続に失敗しました。ネット接続を確認してください")}
+}
+function updateCloudButton(){const b=$("#cloudBtn");if(b)b.textContent=cloudUser?"☁ 接続済":"🔐 クラウド"}
+function cloudError(error){return String(error?.message||error||"不明なエラー").slice(0,180)}
+function currentCloudData(){return backupData().data}
+async function cloudSave(){
+ if(!supabaseClient||!cloudUser)return toast("ログインしてください");
+ if(cloudBusy)return;cloudBusy=true;
+ try{
+  const data=currentCloudData();const json=JSON.stringify(data);
+  if(new Blob([json]).size>CLOUD_MAX_BYTES)throw Error("保存容量の上限（1MB）を超えました");
+  const {error}=await supabaseClient.from("world_saves").upsert({user_id:cloudUser.id,save_data:data,updated_at:new Date().toISOString()},{onConflict:"user_id"});
+  if(error)throw error;toast("クラウドへ保存しました");
+ }catch(e){alert("クラウド保存失敗："+cloudError(e))}finally{cloudBusy=false}
+}
+async function cloudLoad(){
+ if(!supabaseClient||!cloudUser)return toast("ログインしてください");
+ if(cloudBusy)return;cloudBusy=true;
+ try{
+  const {data,error}=await supabaseClient.from("world_saves").select("save_data,updated_at").eq("user_id",cloudUser.id).maybeSingle();
+  if(error)throw error;
+  if(!data){toast("クラウドに保存データがありません");return}
+  const d=validateBackup({format:"nova-world-save",version:1,data:data.save_data});
+  if(!confirm("クラウド保存（"+new Date(data.updated_at).toLocaleString("ja-JP")+"）を読み込むと、この端末の現在のデータを上書きします。先にJSONバックアップを取ることをおすすめします。続けますか？"))return;
+  localStorage.setItem("nova-world-save",JSON.stringify({credits:d.credits,items:d.items,sold:d.sold||[],memories:d.memories||{},missions:d.missions||{},visited:d.visited||{},plot:d.plot||{x:43,z:43}}));
+  location.reload();
+ }catch(e){alert("クラウド読み込み失敗："+cloudError(e))}finally{cloudBusy=false}
+}
+async function cloudLogin(mode){
+ const email=$("#cloudEmail")?.value.trim(),password=$("#cloudPassword")?.value;
+ if(!email||!password)return toast("メールとパスワードを入力してください");
+ if(password.length<6)return toast("パスワードは6文字以上にしてください");
+ if(!supabaseClient)return toast("Supabaseの設定を確認してください");
+ try{
+  const {data,error}=mode==="signup"?await supabaseClient.auth.signUp({email,password}):await supabaseClient.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  cloudUser=data.user||null;
+  if(mode==="signup"&&!data.session)alert("登録受付しました。確認メールが届いたらリンクを開き、ログインしてください。");
+  else toast("ログインしました");
+  cloudPanel();
+ }catch(e){alert("認証エラー："+cloudError(e))}
+}
+function cloudPanel(){
+ let html='<h2>🔐 NOVA クラウド 0.8</h2>';
+ if(!cloudConfigured){html+='<p>Supabaseの接続先が未設定です。index.htmlのSUPABASE_URLとSUPABASE_PUBLISHABLE_KEYを設定し、データベースのSQLを実行してください。</p><p class="small">設定が終わるまでは従来どおり端末内保存・JSONバックアップが使えます。</p>'}
+ else if(!supabaseClient){html+='<p>Supabaseに接続できません。ネット接続と設定を確認してください。</p>'}
+ else if(!cloudUser){html+='<p>メールアドレスで登録・ログインすると、自分専用の世界データをクラウドに保存できます。</p><input id="cloudEmail" type="email" autocomplete="email" placeholder="メールアドレス"><input id="cloudPassword" type="password" autocomplete="current-password" placeholder="パスワード（6文字以上）" style="margin-top:8px"><button id="cloudSignIn" class="primary" style="width:100%;margin-top:8px">ログイン</button><button id="cloudSignUp" style="width:100%;margin-top:8px">新規登録</button><p class="small">メール確認が有効な場合は、受信メールのリンクから確認してください。</p>'}
+ else{html+='<p>ログイン中：'+escapeHtml(cloudUser.email||"ユーザー")+'</p><button id="cloudSave" class="primary" style="width:100%">現在の世界をクラウドに保存</button><button id="cloudLoad" style="width:100%;margin-top:8px">クラウドの世界を読み込む</button><button id="cloudLogout" style="width:100%;margin-top:8px">ログアウト</button><p class="small">同期は手動です。保存はクラウド上の以前のデータを上書きし、読み込みは端末データを上書きします。操作前にJSONバックアップをおすすめします。</p>'}
+ html+='<button id="cloudClose" style="width:100%;margin-top:8px">閉じる</button>';
+ openDrawer(html);
+ if($("#cloudSignIn"))$("#cloudSignIn").onclick=()=>cloudLogin("login");
+ if($("#cloudSignUp"))$("#cloudSignUp").onclick=()=>cloudLogin("signup");
+ if($("#cloudSave"))$("#cloudSave").onclick=cloudSave;
+ if($("#cloudLoad"))$("#cloudLoad").onclick=cloudLoad;
+ if($("#cloudLogout"))$("#cloudLogout").onclick=async()=>{await supabaseClient.auth.signOut();cloudUser=null;cloudPanel();toast("ログアウトしました")};
+ $("#cloudClose").onclick=closeDrawer;
+}
+
 const state = {
  missions: {}, visited: {}, plot: {x:43,z:43},
  credits: 100,
@@ -456,7 +533,7 @@ const insidePlot=(x,z)=>Math.abs(x-plotX)<=plotSize/2-1&&Math.abs(z-plotZ)<=plot
 function movePlayer(x,z){player.position.set(x,0,z);closeDrawer();toast("移動しました")}
 function plotPanel(){
  let count=state.items.filter(it=>it.placed&&insidePlot(it.x||0,it.z||0)).length;
- let html=`<h2>⌂ マイ土地</h2><p>あなた専用の試作エリアです。作品を配置して自分の空間を作れます。保存はこの端末内のみです。</p><p class="small">土地：22×22（試作用） · 配置済み ${count} 件</p>`;
+ let html=`<h2>⌂ マイ土地</h2><p>あなた専用の試作エリアです。作品を配置して自分の空間を作れます。通常は端末内保存です。クラウド画面から手動保存もできます。</p><p class="small">土地：22×22（試作用） · 配置済み ${count} 件</p>`;
  html+='<button class="primary" id="goPlot" style="width:100%">マイ土地へ移動</button><button id="goCenter" style="width:100%;margin-top:8px">中央広場へ戻る</button><button id="plotItems" style="width:100%;margin-top:8px">作品の位置を編集</button><button id="plotNew" style="width:100%;margin-top:8px">新しい作品を作る</button>';
  html+='<p class="small">マイ土地の中で「作品を創作」を押すと、その場所に作品を配置できます。作品の位置は編集画面で変更できます。</p>';
  openDrawer(html);
@@ -538,7 +615,7 @@ function validateBackup(b){
 }
 function backupPanel(){
  let html='<h2>☁ 世界データの保存と復元</h2><p>作品・NOVA・ミッション・住人との会話記録をJSONファイルに保存できます。別の端末へ移す際に利用できます。</p>';
- html+='<button class="primary" id="exportBackup" style="width:100%">バックアップをダウンロード</button><button id="importBackup" style="width:100%;margin-top:8px">バックアップを読み込む</button><input type="file" id="backupFile" accept=".json,application/json" style="display:none"><p class="small">※ 読み込みは現在の端末データを上書きします。先にバックアップを取ってください。会話記録には個人的な内容が含まれる場合があります。ファイルは公開しないでください。</p><p class="small">0.7ではクラウド同期・ユーザー登録・他人への公開はまだ実装していません。</p><button id="closeBackup" style="width:100%">閉じる</button>';
+ html+='<button class="primary" id="exportBackup" style="width:100%">バックアップをダウンロード</button><button id="importBackup" style="width:100%;margin-top:8px">バックアップを読み込む</button><input type="file" id="backupFile" accept=".json,application/json" style="display:none"><p class="small">※ 読み込みは現在の端末データを上書きします。先にバックアップを取ってください。会話記録には個人的な内容が含まれる場合があります。ファイルは公開しないでください。</p><p class="small">0.8ではクラウドへの手動保存とログインに対応します（接続設定が必要）。他人への公開は未実装です。</p><button id="closeBackup" style="width:100%">閉じる</button>';
  openDrawer(html);
  $("#exportBackup").onclick=()=>{
   const blob=new Blob([JSON.stringify(backupData(),null,2)],{type:"application/json"});
@@ -559,6 +636,8 @@ function backupPanel(){
  $("#closeBackup").onclick=closeDrawer;
 }
 $("#backupBtn").onclick=backupPanel;
+$("#cloudBtn").onclick=cloudPanel;
+initCloud();
 
 $("#societyBtn").onclick=societyPanel;
 
